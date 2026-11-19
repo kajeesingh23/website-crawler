@@ -48,7 +48,35 @@ export function recordWebsite(url: string, title: string) {
     .run(randomUUID(), url, title);
 }
 
-export type RecentWebsite = { url: string; title: string | null; last_seen: string };
+/**
+ * Saves something to the library. The screenshot goes to data/screenshots/, everything measured on
+ * the page goes in `observed`. Returns the new item's id.
+ */
+export function saveItem(item: { kind: "animation" | "component"; name: string; sourceUrl?: string; observed: unknown; png?: Buffer }) {
+  const id = randomUUID();
+  let thumbnail: string | null = null;
+  if (item.png) {
+    fs.mkdirSync(path.join(dataDir, "screenshots"), { recursive: true });
+    thumbnail = `screenshots/${id}.png`;
+    fs.writeFileSync(path.join(dataDir, thumbnail), item.png);
+  }
+  try {
+    const site = item.sourceUrl
+      ? (db().prepare("SELECT id FROM websites WHERE url = ?").get(item.sourceUrl) as { id: string } | undefined)
+      : undefined;
+    db()
+      .prepare(
+        "INSERT INTO items (id, kind, name, website_id, source_url, thumbnail, observed) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(id, item.kind, item.name, site?.id ?? null, item.sourceUrl ?? null, thumbnail, JSON.stringify(item.observed));
+  } catch (e) {
+    if (thumbnail) fs.rmSync(path.join(dataDir, thumbnail), { force: true }); // no orphan files
+    throw e;
+  }
+  return id;
+}
+
+export type RecentWebsite ={ url: string; title: string | null; last_seen: string };
 
 export function getHomeData() {
   const d = db();

@@ -58,6 +58,7 @@ export type Design = {
   palette: (Colour & { count: number; uses: string[] })[];
   fonts: { family: string; webFont: boolean }[];
   assets: Asset[];
+  motion: { moving: number; smooth: number }; // animations running now; parts set up to change smoothly
 };
 
 export function extractDesign(el: Element): Design {
@@ -116,6 +117,7 @@ export function extractDesign(el: Element): Design {
     assets.push(a);
   };
 
+  let smooth = 0;
   for (const n of [el, ...el.querySelectorAll("*")].slice(0, 400)) {
     const r = n.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) continue;
@@ -123,6 +125,7 @@ export function extractDesign(el: Element): Design {
     if (s.visibility === "hidden") continue;
     const tag = n.tagName.toLowerCase();
     const size = { width: Math.round(r.width), height: Math.round(r.height) };
+    if (s.transitionDuration.split(",").some((d) => parseFloat(d) > 0)) smooth++;
 
     if (n instanceof SVGElement) {
       if (tag !== "svg") {
@@ -212,5 +215,6 @@ export function extractDesign(el: Element): Design {
       .map(({ uses, ...c }) => ({ ...c, uses: [...uses] })),
     fonts: [...fonts].map(([family, webFont]) => ({ family, webFont })),
     assets,
+    motion: { moving: el.getAnimations({ subtree: true }).length, smooth },
   };
 }

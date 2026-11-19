@@ -1,4 +1,5 @@
 import type { Design } from "./extract.ts";
+import type { Anim, MotionState } from "./motion.ts";
 
 type Layout = Design["layout"];
 
@@ -61,3 +62,140 @@ const WEIGHTS: Record<string, string> = {
 };
 
 export const weightName = (w: string) => (WEIGHTS[w] ? `${WEIGHTS[w]} (${w})` : w);
+
+// ---------- Motion ----------
+
+export type Movement = { dx: number; dy: number; scale: number; rotate: number; relative?: boolean };
+export type Change = { part: string; prop: string; from: string; to: string };
+
+const IDENTITY: Movement = { dx: 0, dy: 0, scale: 1, rotate: 0 };
+
+/** Reads a CSS transform ("translateY(20px) scale(1.05)", "matrix(…)", "none") into plain numbers. */
+export function parseTransform(css: string | undefined): Movement {
+  const m: Movement = { ...IDENTITY };
+  if (!css || css === "none") return m;
+  for (const [, fn, args] of css.matchAll(/([a-zA-Z0-9]+)\(([^)]*)\)/g)) {
+    const v = args.split(/[\s,]+/).filter(Boolean);
+    const num = (i: number) => parseFloat(v[i] ?? "0") || 0;
+    const len = (i: number) => {
+      if (v[i]?.endsWith("%")) m.relative = true;
+      return num(i);
+    };
+    const deg = (i: number) => {
+      const s = v[i] ?? "0";
+      if (s.endsWith("turn")) return num(i) * 360;
+      if (s.endsWith("rad")) return (num(i) * 180) / Math.PI;
+      return num(i);
+    };
+    switch (fn) {
+      case "translate": case "translate3d": m.dx += len(0); m.dy += len(1); break;
+      case "translateX": m.dx += len(0); break;
+      case "translateY": m.dy += len(0); break;
+      case "scale": case "scale3d": m.scale *= num(0); break;
+      case "scaleX": case "scaleY": m.scale *= num(0); break;
+      case "rotate": case "rotateZ": m.rotate += deg(0); break;
+      case "matrix": m.scale *= Math.hypot(num(0), num(1)); m.rotate += (Math.atan2(num(1), num(0)) * 180) / Math.PI; m.dx += num(4); m.dy += num(5); break;
+      case "matrix3d": m.scale *= Math.hypot(num(0), num(1)); m.rotate += (Math.atan2(num(1), num(0)) * 180) / Math.PI; m.dx += num(12); m.dy += num(13); break;
+    }
+  }
+  return m;
+}
+
+export function movementBetween(from?: string, to?: string): Movement {
+  const a = parseTransform(from);
+  const b = parseTransform(to);
+  return { dx: b.dx - a.dx, dy: b.dy - a.dy, scale: b.scale / (a.scale || 1), rotate: b.rotate - a.rotate, relative: a.relative || b.relative };
+}
+
+/** "Moves up 20px, fades in" — empty when nothing visible changes. */
+export function describeMovement(m: Movement, opacity?: [number, number]): string {
+  const unit = m.relative ? "% of its size" : "px";
+  const r = (v: number) => Math.round(Math.abs(v) * 10) / 10;
+  const steps: string[] = [];
+  const moves = [
+    Math.abs(m.dy) >= 0.5 && `${m.dy < 0 ? "up" : "down"} ${r(m.dy)}${unit}`,
+    Math.abs(m.dx) >= 0.5 && `${m.dx < 0 ? "left" : "right"} ${r(m.dx)}${unit}`,
+  ].filter(Boolean);
+  if (moves.length) steps.push(`moves ${moves.join(" and ")}`);
+  if (Math.abs(m.scale - 1) >= 0.005) steps.push(`${m.scale > 1 ? "grows" : "shrinks"} ${Math.round(Math.abs(m.scale - 1) * 100)}%`);
+  if (Math.abs(m.rotate) >= 0.5) steps.push(`turns ${r(m.rotate)}°${m.rotate < 0 ? " anticlockwise" : ""}`);
+  if (opacity && Math.abs(opacity[1] - opacity[0]) >= 0.05) steps.push(opacity[1] > opacity[0] ? "fades in" : "fades out");
+  const text = steps.join(", ");
+  return text && text[0].toUpperCase() + text.slice(1);
+}
+
+/** What visibly changed between two photos of the same element. */
+export function diffStates(a: MotionState, b: MotionState, only?: string[]): Change[] {
+  const out: Change[] = [];
+  for (let i = 0; i < Math.min(a.styles.length, b.styles.length); i++)
+    for (const prop of Object.keys(a.styles[i])) {
+      if (only && !only.includes(prop)) continue;
+      const from = a.styles[i][prop];
+      const to = b.styles[i][prop];
+      if (from !== to) out.push({ part: a.parts[i], prop, from, to });
+    }
+  return out.slice(0, 40);
+}
+
+/** Animations present in the later photo that weren't running in the earlier one. */
+export const newAnimations = (before: MotionState, ...after: MotionState[]): Anim[] => {
+  const seen = new Set(before.animations.map((a) => a.key));
+  return after.flatMap((s) => s.animations).filter((a) => !seen.has(a.key) && (seen.add(a.key), true));
+};
+
+export const PROP_NAMES: Record<string, string> = {
+  transform: "Position and size",
+  translate: "Position",
+  scale: "Size",
+  rotate: "Rotation",
+  opacity: "Opacity",
+  filter: "Filter",
+  color: "Text colour",
+  "background-color": "Background",
+  "border-color": "Border colour",
+  "box-shadow": "Shadow",
+  "border-radius": "Corners",
+  "outline-color": "Outline",
+  "text-decoration-line": "Underline",
+  "clip-path": "Clip shape",
+  all: "Everything",
+};
+
+const NAMED_EASINGS: Record<string, [number, number, number, number]> = {
+  linear: [0, 0, 1, 1],
+  ease: [0.25, 0.1, 0.25, 1],
+  "ease-in": [0.42, 0, 1, 1],
+  "ease-out": [0, 0, 0.58, 1],
+  "ease-in-out": [0.42, 0, 0.58, 1],
+};
+
+/** The four numbers behind an easing curve, or null for steps()/linear() lists. */
+export function bezierOf(easing: string): [number, number, number, number] | null {
+  if (NAMED_EASINGS[easing]) return NAMED_EASINGS[easing];
+  const m = easing.match(/^cubic-bezier\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)$/);
+  return m ? [+m[1], +m[2], +m[3], +m[4]] : null;
+}
+
+export function easingName(easing: string): string {
+  const named: Record<string, string> = {
+    linear: "Steady speed",
+    ease: "Gentle start and end",
+    "ease-in": "Starts slow, speeds up",
+    "ease-out": "Starts fast, slows down",
+    "ease-in-out": "Slow start and end",
+  };
+  if (named[easing]) return named[easing];
+  const b = bezierOf(easing);
+  if (!b) return easing.startsWith("steps") ? "Jumps in steps" : "Custom curve";
+  const [x1, y1, x2, y2] = b;
+  if (Math.min(y1, y2) < 0 || Math.max(y1, y2) > 1) return "Springy, overshoots";
+  // A flat start (or flat end) on the curve means slow movement there.
+  const slowStart = x1 > 0 && y1 / x1 < 0.5;
+  const slowEnd = x2 < 1 && (1 - y2) / (1 - x2) < 0.5;
+  if (slowStart && slowEnd) return "Slow start and end";
+  if (slowStart) return "Starts slow, speeds up";
+  if (slowEnd) return "Starts fast, slows down";
+  return "Steady speed";
+}
+
+export const duration = (ms: number) => (ms >= 1000 ? `${Math.round(ms / 100) / 10}s` : `${Math.round(ms)}ms`);

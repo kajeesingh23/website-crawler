@@ -25,3 +25,29 @@ test("font weights get names", () => {
   assert.equal(weightName("600"), "Semibold (600)");
   assert.equal(weightName("550"), "550");
 });
+
+import { bezierOf, describeMovement, diffStates, easingName, movementBetween, parseTransform } from "../src/lib/inspector/describe.ts";
+
+test("transforms become plain movements", () => {
+  assert.equal(describeMovement(movementBetween("matrix(1, 0, 0, 1, 0, 0)", "matrix(1, 0, 0, 1, 0, -2)")), "Moves up 2px");
+  assert.equal(describeMovement(movementBetween("translateY(20px)", "none"), [0, 1]), "Moves up 20px, fades in");
+  assert.equal(describeMovement(movementBetween("none", "scale(1.05)")), "Grows 5%");
+  assert.equal(describeMovement(movementBetween("rotate(0deg)", "rotate(1turn)")), "Turns 360°");
+  assert.equal(describeMovement(movementBetween("translateX(-100%)", "none")), "Moves right 100% of its size");
+  assert.equal(describeMovement(movementBetween("none", "none"), [1, 1]), "");
+  assert.equal(parseTransform("matrix3d(1,0,0,0,0,1,0,0,0,0,1,0,5,7,0,1)").dy, 7);
+});
+
+test("easing curves get plain names", () => {
+  assert.deepEqual(bezierOf("ease-out"), [0, 0, 0.58, 1]);
+  assert.equal(bezierOf("steps(4, end)"), null);
+  assert.equal(easingName("cubic-bezier(0.4, 0, 0.2, 1)"), "Slow start and end");
+  assert.equal(easingName("cubic-bezier(0.34, 1.56, 0.64, 1)"), "Springy, overshoots");
+  assert.equal(easingName("cubic-bezier(0.22, 1, 0.36, 1)"), "Starts fast, slows down");
+});
+
+test("only real changes are reported", () => {
+  const s = (bg: string) => ({ parts: ["Whole element"], styles: [{ "background-color": bg, opacity: "1" }], animations: [], transitions: [], scrollTimelines: [] });
+  assert.deepEqual(diffStates(s("red"), s("blue")), [{ part: "Whole element", prop: "background-color", from: "red", to: "blue" }]);
+  assert.deepEqual(diffStates(s("red"), s("red")), []);
+});

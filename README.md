@@ -7,7 +7,7 @@ they work, and saving them to a personal visual library that Claude can reuse.
 
 ## Status
 
-Phases 1–2 are built: explore a website, select anything, and see its design. See [docs/ROADMAP.md](docs/ROADMAP.md).
+Phases 1–3 are built: explore a website, select anything, see its design and how it moves. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Using it
 
@@ -20,6 +20,10 @@ Phases 1–2 are built: explore a website, select anything, and see its design. 
 5. Below the preview, the design inspector shows what was measured on the page: colours
    (click to copy), typography with a live preview, layout in plain words with a spacing
    diagram, all colours used inside, and its images, icons and videos.
+6. **Explore animation** watches the selection for a few seconds: on its own, on hover, on focus
+   and while scrolling into view (the website window visibly hovers and scrolls). It shows what
+   changed, timing and easing in plain words, and a preview with play, pause, replay and speed.
+   Name it and **Save animation** to keep it in your library.
 
 ## Install
 

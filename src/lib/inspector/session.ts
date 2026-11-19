@@ -4,8 +4,17 @@ import { overlay, type ElementInfo, type PageEvent } from "./overlay.ts";
 import { recordWebsite } from "../db.ts";
 import { normaliseUrl } from "../url.ts";
 import { extractDesign, type Design } from "./extract.ts";
+import { motionState, type Anim, type Declared } from "./motion.ts";
+import { diffStates, newAnimations, type Change } from "./describe.ts";
 
-export type Selection = ElementInfo & { id: number; screenshot?: string; design?: Design; designFailed?: boolean };
+export type Selection = ElementInfo & {
+  id: number;
+  screenshot?: string;
+  design?: Design;
+  designFailed?: boolean;
+  motion?: Motion;
+  motionStatus?: "running" | "done" | "failed";
+};
 
 export type Snapshot = {
   status: "idle" | "opening" | "open" | "closed" | "error";
@@ -16,7 +25,7 @@ export type Snapshot = {
   selection: Selection | null;
 };
 
-export const COMMANDS = ["parent", "child", "next", "prev", "clear", "inspect-on", "inspect-off"] as const;
+export const COMMANDS = ["parent", "child", "next", "prev", "clear", "inspect-on", "inspect-off", "motion"] as const;
 export type Command = (typeof COMMANDS)[number];
 
 type Session = { browser?: Browser; page?: Page; snap: Snapshot; bus: EventEmitter; seq: number };
@@ -146,9 +155,24 @@ async function capture(id: number) {
   }
 }
 
+/** Selects the first element matching a CSS address. Returns false when nothing matches. */
+export async function selectBySelector(css: string): Promise<boolean> {
+  const page = s.page;
+  if (!page) throw new Error("Open a website first.");
+  return page
+    .evaluate((c) => (window as unknown as { __pdi?: { selectCss(c: string): boolean } }).__pdi?.selectCss(c) ?? false, css)
+    .catch(() => false);
+}
+
 export async function runCommand(cmd: Command) {
   const page = s.page;
   if (!page) throw new Error("Open a website first.");
+  if (cmd === "motion") {
+    const sel = s.snap.selection;
+    if (!sel) throw new Error("Select something first.");
+    if (sel.motionStatus !== "running") void exploreMotion(sel.id); // takes a few seconds; results arrive live
+    return;
+  }
   if (cmd === "inspect-on" || cmd === "inspect-off") {
     const on = cmd === "inspect-on";
     set({ inspecting: on });
@@ -162,6 +186,120 @@ export async function runCommand(cmd: Command) {
       else api[c as string]();
     }, [cmd, s.snap.inspecting] as const)
     .catch(() => undefined); // page mid-navigation: the "ready" handshake restores the mode
+}
+
+export type Interaction = { changes: Change[]; animations: Anim[] };
+
+export type Motion = {
+  running: Anim[]; // already moving while nobody touches it
+  scriptedIdle: boolean; // moves, but not through an animation the browser can describe
+  transitions: Declared[]; // smooth changes the element is set up for
+  hover: Interaction | null;
+  focus: Interaction | null; // null: can't be focused
+  scroll: (Interaction & { scripted: boolean }) | null; // null: visible from the start, so it can't be tested
+  scrollTimelines: string[];
+};
+
+const MOVE_PROPS = ["transform", "translate", "scale", "rotate", "opacity"];
+
+/**
+ * Watches the selected element: at rest, hovered, focused and scrolled into view.
+ * Everything reported was seen happening on the page. Clicks are never tested, so the site can't navigate away.
+ */
+async function exploreMotion(id: number) {
+  const page = s.page;
+  if (!page) return;
+  patchSelection(id, { motion: undefined, motionStatus: "running" });
+  const handle = await page.evaluateHandle(() => (window as unknown as PdiWindow).__pdi.selected).catch(() => null);
+  const el = handle?.asElement();
+  try {
+    if (!el) throw new Error("Selection is gone");
+    const photo = () => el.evaluate(motionState);
+    const wait = (ms: number) => page.waitForTimeout(ms);
+    // Not Playwright's scrollIntoViewIfNeeded: it waits for movement to stop, and a looping animation never does.
+    await el.evaluate((e) => e.scrollIntoView({ block: "nearest", behavior: "instant" }));
+    // A screen corner outside the element, to rest the mouse on.
+    const away = async () => {
+      const b = await el.boundingBox();
+      const [w, h] = await page.evaluate(() => [innerWidth, innerHeight]);
+      const corners = [[w - 2, h - 2], [2, h - 2], [w - 2, 2], [2, 2]];
+      const free = corners.find(([x, y]) => !b || x < b.x || x > b.x + b.width || y < b.y || y > b.y + b.height) ?? corners[0];
+      await page.mouse.move(free[0], free[1]);
+    };
+    // The click that selected it leaves the mouse on top of it; start from a true resting state.
+    await away();
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await wait(400);
+
+    const rest = await photo();
+    await wait(400);
+    const rest2 = await photo();
+    // Long enough for the slowest declared transition to finish (capped so it never feels stuck).
+    const settle = Math.min(1500, Math.max(200, ...rest.transitions.map((t) => t.duration + t.delay))) + 100;
+
+    let hover: Interaction | null = null;
+    const box = await el.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await wait(settle);
+      const hovered = await photo();
+      hover = { changes: diffStates(rest2, hovered), animations: newAnimations(rest2, hovered) };
+      await away();
+      await wait(settle);
+    }
+
+    let focus: Interaction | null = null;
+    if (await el.evaluate((e) => e.matches("a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])"))) {
+      await el.focus();
+      await wait(settle);
+      const focused = await photo();
+      focus = { changes: diffStates(rest2, focused), animations: newAnimations(rest2, focused) };
+      await el.evaluate((e) => (e as HTMLElement).blur());
+      await wait(settle);
+    }
+
+    // Scroll it just out of view below the screen, then back in, and watch what happens.
+    let scroll: Motion["scroll"] = null;
+    const hidden = await el.evaluate((e) => {
+      const top = e.getBoundingClientRect().top + scrollY;
+      if (top - innerHeight - 20 < 0) return false;
+      scrollTo({ top: top - innerHeight - 20, behavior: "instant" });
+      return true;
+    });
+    if (hidden) {
+      await wait(500);
+      const before = await photo();
+      await el.evaluate((e) => e.scrollIntoView({ block: "center", behavior: "instant" }));
+      await wait(120);
+      const entering = await photo();
+      await wait(1300);
+      const after = await photo();
+      scroll = {
+        changes: diffStates(before, after),
+        animations: newAnimations(before, entering, after),
+        scripted: entering.animations.length === 0 && diffStates(entering, after, MOVE_PROPS).length > 0,
+      };
+    } else {
+      await el.evaluate((e) => e.scrollIntoView({ block: "center", behavior: "instant" }));
+    }
+
+    patchSelection(id, {
+      motionStatus: "done",
+      motion: {
+        running: rest.animations,
+        scriptedIdle: rest.animations.length === 0 && diffStates(rest, rest2, MOVE_PROPS).length > 0,
+        transitions: rest.transitions,
+        hover,
+        focus,
+        scroll,
+        scrollTimelines: rest.scrollTimelines,
+      },
+    });
+  } catch {
+    patchSelection(id, { motionStatus: "failed" });
+  } finally {
+    await handle?.dispose().catch(() => undefined);
+  }
 }
 
 export async function closeWebsite() {

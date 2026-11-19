@@ -65,6 +65,10 @@ test("hover, select and move around the page without the site reacting", async (
     assert.equal(frame.info?.label, "Embedded frame");
     assert.match(frame.info?.note ?? "", /another website/);
 
+    assert.equal(await page.evaluate(() => (window as never as { __pdi: { selectCss(c: string): boolean } }).__pdi.selectCss("#btn")), true);
+    assert.equal((await next("select")).info?.label, "Button");
+    assert.equal(await page.evaluate(() => (window as never as { __pdi: { selectCss(c: string): boolean } }).__pdi.selectCss("((bad")), false);
+
     await page.keyboard.press("Escape");
     await next("clear");
   } finally {

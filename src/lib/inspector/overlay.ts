@@ -193,6 +193,17 @@ export function overlay() {
       const c = selected && [...selected.children].find(visible);
       if (c) select(c);
     },
+    // Select by CSS address, for when Claude (not the mouse) picks the element.
+    selectCss(css: string) {
+      let el: Element | null = null;
+      try {
+        el = document.querySelector(css);
+      } catch {}
+      if (!el) return false;
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+      select(el);
+      return true;
+    },
     next: () => step("next"),
     prev: () => step("prev"),
     clear() {

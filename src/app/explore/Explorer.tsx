@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Command, Snapshot } from "@/lib/inspector/session";
 import { Inspector } from "./Inspector";
+import { MotionPanel } from "./Motion";
 
-const NEXT_UP = ["Explore animation", "Save assets", "Recreate component", "Save to library"];
+const NEXT_UP = ["Save assets", "Recreate component", "Save components to the library"];
 
 export function Explorer({ initialUrl }: { initialUrl?: string }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
@@ -145,6 +146,47 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
                 <Chip onClick={() => send("next")}>Next</Chip>
                 <Chip onClick={() => send("clear")}>Clear</Chip>
               </div>
+
+              <section className="mt-8 rounded-2xl border border-line p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-display text-2xl">Animation</h3>
+                    {sel.design && sel.motionStatus !== "done" && (
+                      <p className="text-sm text-muted">
+                        {sel.design.motion.moving > 0
+                          ? "Something here is moving right now."
+                          : sel.design.motion.smooth > 0
+                            ? "This is set up to change smoothly, probably on hover or scroll."
+                            : "No motion spotted yet. Exploring checks hover, focus and scrolling."}
+                      </p>
+                    )}
+                  </div>
+                  {sel.motionStatus !== "running" && (
+                    <button
+                      type="button"
+                      onClick={() => send("motion")}
+                      className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90"
+                    >
+                      {sel.motionStatus === "done" ? "Explore again" : "Explore animation"}
+                    </button>
+                  )}
+                </div>
+                {sel.motionStatus === "running" && (
+                  <p className="mt-3 text-sm text-muted" role="status">
+                    Watching how it moves… The website window will hover over it and scroll for a few seconds.
+                  </p>
+                )}
+                {sel.motionStatus === "failed" && (
+                  <p className="mt-3 text-sm text-danger" role="alert">
+                    Couldn’t watch this element. It may have disappeared; try selecting it again.
+                  </p>
+                )}
+                {sel.motionStatus === "done" && sel.motion && (
+                  <div className="mt-6">
+                    <MotionPanel key={sel.id} motion={sel.motion} image={sel.screenshot} />
+                  </div>
+                )}
+              </section>
 
               {sel.design ? (
                 <Inspector design={sel.design} sample={sel.text.slice(0, 80)} />

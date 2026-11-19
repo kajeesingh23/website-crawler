@@ -13,10 +13,26 @@ process.env.PDI_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "pdi-test-"));
 
 const { openWebsite, runCommand, getSnapshot, closeWebsite } = await import("../src/lib/inspector/session.ts");
 const { getHomeData } = await import("../src/lib/db.ts");
-const { describeLayout } = await import("../src/lib/inspector/describe.ts");
+const { describeLayout, describeMovement, movementBetween } = await import("../src/lib/inspector/describe.ts");
+const { saveItem } = await import("../src/lib/db.ts");
 
-const server = http.createServer((_req, res) => {
+const MOTION_PAGE = `<title>Motion lab</title><style>
+  body{margin:0}
+  #btn{padding:12px;background:#111111;color:#fff;transition:transform .2s ease-out,background-color .2s ease-out}
+  #btn:hover{transform:translateY(-2px);background:#333333}
+  #spin{width:20px;height:20px;background:#ff5c28;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #reveal{margin-top:2000px;height:80px;background:#3b6cff;opacity:0;transform:translateY(24px);transition:opacity .4s ease-out,transform .4s ease-out}
+  #reveal.in{opacity:1;transform:none}
+</style>
+<button id="btn">Hover me</button><div id="spin"></div><div id="reveal"></div><div style="height:1500px"></div>
+<script>
+  new IntersectionObserver(([e]) => e.target.classList.toggle("in", e.isIntersecting)).observe(document.getElementById("reveal"));
+</script>`;
+
+const server = http.createServer((req, res) => {
   res.setHeader("content-type", "text/html");
+  if (req.url === "/motion") return res.end(MOTION_PAGE);
   res.end(`<title>Test studio</title><body style="margin:0;background:#f7f6f3">
     <nav style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:8px 24px">
       <svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="#ff5c28"/></svg>
@@ -35,8 +51,8 @@ after(async () => {
   fs.rmSync(process.env.PDI_DATA_DIR!, { recursive: true, force: true });
 });
 
-const until = async <T>(fn: () => T | undefined, what: string): Promise<T> => {
-  for (let i = 0; i < 150; i++) {
+const until = async <T>(fn: () => T | undefined, what: string, tries = 150): Promise<T> => {
+  for (let i = 0; i < tries; i++) {
     const v = fn();
     if (v) return v;
     await new Promise((r) => setTimeout(r, 20));
@@ -84,6 +100,49 @@ test("open → select → preview → remembered on Home", async () => {
 
   await runCommand("clear");
   await until(() => getSnapshot().selection === null || undefined, "clear");
+});
+
+test("motion: hover, looping and scroll-in animations are observed and can be saved", { timeout: 30_000 }, async () => {
+  await openWebsite(`${url}motion`);
+  await runCommand("inspect-on");
+  const page = (globalThis as unknown as { __pdiSession: { page: Page } }).__pdiSession.page;
+  const explore = async (selector: string) => {
+    const before = getSnapshot().selection?.id;
+    // A real click at its position (Playwright's click waits for movement to stop, and a spinner never does).
+    await page.locator(selector).evaluate((e) => e.scrollIntoView({ block: "center" }));
+    const b = (await page.locator(selector).boundingBox())!;
+    await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+    const sel = await until(() => {
+      const cur = getSnapshot().selection;
+      return cur && cur.id !== before && cur.design ? cur : undefined;
+    }, `${selector} selected`);
+    assert.ok(sel.design!.motion.moving + sel.design!.motion.smooth > 0, "motion hint");
+    await runCommand("motion");
+    return (await until(() => (getSnapshot().selection?.motionStatus === "done" ? getSnapshot().selection ?? undefined : undefined), `${selector} motion`, 500)).motion!;
+  };
+
+  const btn = await explore("#btn");
+  const bg = btn.hover!.changes.find((c) => c.prop === "background-color")!;
+  assert.deepEqual([bg.from, bg.to], ["rgb(17, 17, 17)", "rgb(51, 51, 51)"]);
+  const t = btn.hover!.changes.find((c) => c.prop === "transform")!;
+  assert.equal(describeMovement(movementBetween(t.from, t.to)), "Moves up 2px");
+  assert.deepEqual(btn.transitions.map((d) => [d.prop, d.duration, d.easing]), [["transform", 200, "ease-out"], ["background-color", 200, "ease-out"]]);
+  assert.ok(btn.focus, "a button can be focused");
+
+  const spin = await explore("#spin");
+  const loop = spin.running.find((a) => a.name === "spin")!;
+  assert.deepEqual([loop.kind, loop.iterations, loop.duration, loop.easing], ["css-animation", "infinite", 1000, "linear"]);
+  assert.equal(describeMovement(movementBetween(String(loop.keyframes[0].transform ?? "none"), String(loop.keyframes.at(-1)!.transform))), "Turns 360°");
+
+  const reveal = await explore("#reveal");
+  assert.ok(reveal.scroll, "far down the page, so scrolling can be tested");
+  const op = reveal.scroll!.changes.find((c) => c.prop === "opacity")!;
+  assert.deepEqual([op.from, op.to], ["0", "1"]);
+  assert.equal(reveal.focus, null);
+
+  const id = saveItem({ kind: "animation", name: "Scroll reveal", sourceUrl: getSnapshot().url, observed: { motion: reveal } });
+  assert.ok(id);
+  assert.equal(getHomeData().animations, 1);
 });
 
 test("bad links never reach the browser", async () => {
