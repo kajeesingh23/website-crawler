@@ -29,6 +29,7 @@ const GROUPS: Partial<Record<Filter, string[]>> = {
 };
 
 export type Query = {
+  id?: string; // one item
   q?: string;
   filter?: Filter;
   collection?: string;
@@ -80,6 +81,7 @@ export function listItems(query: Query = {}): ItemCard[] {
   if (f === "favourites") add("i.favourite = 1");
   const group = GROUPS[f];
   if (group) add(`${CAT} IN (${group.map(() => "?").join(",")})`, ...group);
+  if (query.id) add("i.id = ?", query.id);
   if (query.collection) add("i.id IN (SELECT item_id FROM collection_items WHERE collection_id = ?)", query.collection);
   if (query.website) add("i.website_id = ?", query.website);
   if (query.category) add(`${CAT} = ?`, query.category);
@@ -156,7 +158,7 @@ export type ItemDetail = ItemCard & {
 };
 
 export function getItem(id: string): ItemDetail | null {
-  const base = listItems().find((i) => i.id === id);
+  const [base] = listItems({ id });
   if (!base) return null;
   const row = db().prepare("SELECT notes, observed, inferred, updated_at FROM items WHERE id = ?").get(id) as Record<string, string>;
   const versions = (
