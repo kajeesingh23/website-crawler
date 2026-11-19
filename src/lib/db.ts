@@ -52,7 +52,17 @@ export function recordWebsite(url: string, title: string) {
  * Saves something to the library. The screenshot goes to data/screenshots/, everything measured on
  * the page goes in `observed`. Returns the new item's id.
  */
-export function saveItem(item: { kind: "animation" | "component"; name: string; sourceUrl?: string; observed: unknown; inferred?: unknown; png?: Buffer }) {
+export function saveItem(item: {
+  kind: "animation" | "component";
+  name: string;
+  sourceUrl?: string;
+  observed: unknown;
+  inferred?: unknown;
+  png?: Buffer;
+  category?: string;
+  tags?: string[];
+  description?: string;
+}) {
   const id = randomUUID();
   let thumbnail: string | null = null;
   if (item.png) {
@@ -66,9 +76,14 @@ export function saveItem(item: { kind: "animation" | "component"; name: string; 
       : undefined;
     db()
       .prepare(
-        "INSERT INTO items (id, kind, name, website_id, source_url, thumbnail, observed, inferred) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        `INSERT INTO items (id, kind, name, website_id, source_url, thumbnail, observed, inferred, category, tags, description, board_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MIN(board_order), 0) - 1 FROM items))`, // newest first on the board
       )
-      .run(id, item.kind, item.name, site?.id ?? null, item.sourceUrl ?? null, thumbnail, JSON.stringify(item.observed), JSON.stringify(item.inferred ?? {}));
+      .run(
+        id, item.kind, item.name, site?.id ?? null, item.sourceUrl ?? null, thumbnail,
+        JSON.stringify(item.observed), JSON.stringify(item.inferred ?? {}),
+        item.category ?? null, JSON.stringify(item.tags ?? []), item.description ?? null,
+      );
   } catch (e) {
     if (thumbnail) fs.rmSync(path.join(dataDir, thumbnail), { force: true }); // no orphan files
     throw e;
@@ -86,16 +101,20 @@ export function saveComponent(c: {
   html: string;
   react?: string;
   note?: string;
+  category?: string;
+  tags?: string[];
+  description?: string;
 }) {
-  const id = saveItem({ kind: "component", name: c.name, sourceUrl: c.sourceUrl, png: c.png, observed: c.observed, inferred: c.inferred });
+  const { html, react, note, ...item } = c;
+  const id = saveItem({ kind: "component", ...item });
   const rel = `components/${id}/v1`;
   try {
     fs.mkdirSync(path.join(dataDir, rel), { recursive: true });
-    fs.writeFileSync(path.join(dataDir, rel, "component.html"), c.html);
-    if (c.react) fs.writeFileSync(path.join(dataDir, rel, "Component.tsx"), c.react);
+    fs.writeFileSync(path.join(dataDir, rel, "component.html"), html);
+    if (react) fs.writeFileSync(path.join(dataDir, rel, "Component.tsx"), react);
     db()
       .prepare("INSERT INTO item_versions (id, item_id, version, framework, code_path, change_note) VALUES (?, ?, 1, ?, ?, ?)")
-      .run(randomUUID(), id, c.react ? "html-css, react" : "html-css", rel, c.note ?? null);
+      .run(randomUUID(), id, react ? "html-css, react" : "html-css", rel, note ?? null);
   } catch (e) {
     // Don't leave a half-saved component behind.
     db().prepare("DELETE FROM items WHERE id = ?").run(id);

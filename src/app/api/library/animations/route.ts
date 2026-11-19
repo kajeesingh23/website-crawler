@@ -1,5 +1,6 @@
 import { saveItem } from "@/lib/db";
 import { getSnapshot } from "@/lib/inspector/session";
+import { describeForLibrary } from "@/lib/library";
 
 /** Saves the animation of the current selection to the library, under a name you choose. */
 export async function POST(req: Request) {
@@ -16,6 +17,7 @@ export async function POST(req: Request) {
   const id = saveItem({
     kind: "animation",
     name: title,
+    ...describeForLibrary(sel, url),
     sourceUrl: url,
     png,
     observed: { element: { label: sel.label, path: sel.path, width: sel.width, height: sel.height }, motion: sel.motion },

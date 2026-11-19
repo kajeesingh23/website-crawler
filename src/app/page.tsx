@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { getHomeData } from "@/lib/db";
+import { listCollections, listItems, type ItemCard } from "@/lib/library";
 
 export default async function Home() {
   await connection(); // always show the library as it is right now
   const d = getHomeData();
+  const all = listItems();
+  const recent = [...all].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 6);
+  const favourites = all.filter((i) => i.favourite).slice(0, 6);
+  const collections = listCollections().slice(0, 6);
   const stats = [
     ["Saved components", d.components],
     ["Saved animations", d.animations],
@@ -56,13 +61,61 @@ export default async function Home() {
         </section>
         <section>
           <h2 className="mb-3 text-sm font-medium text-muted">Recently saved</h2>
-          <Empty
-            title="Start your collection"
-            body="Select something you like on a website and save it. It will show up here and on My Board."
-          />
+          {recent.length ? (
+            <Thumbs items={recent} />
+          ) : (
+            <Empty
+              title="Start your collection"
+              body="Select something you like on a website and save it. It will show up here and on My Board."
+            />
+          )}
         </section>
       </div>
+
+      {(favourites.length > 0 || collections.length > 0) && (
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          <section>
+            <h2 className="mb-3 text-sm font-medium text-muted">Favourites</h2>
+            {favourites.length ? <Thumbs items={favourites} /> : <Empty title="No favourites yet" body="Star anything on My Board to keep it close." />}
+          </section>
+          <section>
+            <h2 className="mb-3 text-sm font-medium text-muted">Recent collections</h2>
+            {collections.length ? (
+              <ul className="divide-y divide-line rounded-2xl border border-line bg-surface">
+                {collections.map((c) => (
+                  <li key={c.id}>
+                    <Link href={`/board?collection=${c.id}`} className="flex justify-between px-5 py-3 hover:bg-bg">
+                      <span className="truncate font-medium">{c.name}</span>
+                      <span className="text-sm text-muted tabular-nums">{c.count}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty title="No collections yet" body="Group references on My Board, like Premium Navigation or Creative Animations." />
+            )}
+          </section>
+        </div>
+      )}
     </div>
+  );
+}
+
+function Thumbs({ items }: { items: ItemCard[] }) {
+  return (
+    <ul className="grid grid-cols-3 gap-2">
+      {items.map((i) => (
+        <li key={i.id}>
+          <Link href={`/library/${i.id}`} className="block overflow-hidden rounded-xl border border-line bg-surface hover:border-muted">
+            <div className="flex h-20 items-center justify-center bg-bg p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {i.thumbnail ? <img src={`/api/library/files/${i.thumbnail}`} alt="" className="max-h-full max-w-full object-contain" loading="lazy" /> : null}
+            </div>
+            <div className="truncate px-2 py-1.5 text-xs">{i.name}</div>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 

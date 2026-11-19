@@ -1,5 +1,6 @@
 import { saveComponent } from "@/lib/db";
 import { getSnapshot } from "@/lib/inspector/session";
+import { describeForLibrary } from "@/lib/library";
 import { applyOverrides, type Overrides } from "@/lib/recreate/document";
 
 type Body = {
@@ -30,6 +31,7 @@ export async function POST(req: Request) {
     : undefined;
   const id = saveComponent({
     name,
+    ...describeForLibrary(sel, url),
     sourceUrl: url,
     png,
     html: applyOverrides(b.html, b.overrides ?? {}),

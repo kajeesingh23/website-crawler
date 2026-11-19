@@ -7,7 +7,7 @@ they work, and saving them to a personal visual library that Claude can reuse.
 
 ## Status
 
-Phases 1–4 are built: explore a website, select anything, see its design and motion, recreate it as code and make it yours. See [docs/ROADMAP.md](docs/ROADMAP.md).
+Phases 1–5 are built: explore a website, select anything, see its design and motion, recreate it as code, make it yours, and keep everything on your board. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Using it
 
@@ -29,6 +29,14 @@ Phases 1–4 are built: explore a website, select anything, see its design and m
    React version, **Improve the Match**, and changes by instruction. Every version is rendered and
    measured against the original ("Matches 12 of 13 measured properties"), shown side by side or as
    an overlay, and can be customised with colour pickers and sliders before you save it.
+
+8. **My Board** shows everything you save as visual cards: filter (components, animations,
+   typography, layouts, page sections, favourites), search in plain words, drag to rearrange,
+   star favourites, select several to add to collections, compare or delete. An item can be in
+   many collections without being copied. Open a card for its live preview, measured design,
+   animation, code (copy or export), notes, tags and version history.
+9. **Design Library** searches everything in your own words ("dark navigation", "buttons that
+   follow the cursor") and filters by website, kind, tag and date.
 
 ### Connecting Claude (optional)
 

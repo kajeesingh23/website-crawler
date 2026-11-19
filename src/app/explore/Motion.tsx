@@ -18,7 +18,7 @@ const PLAYABLE = new Set(["transform", "translate", "scale", "rotate", "opacity"
 const COLOUR_PROPS = new Set(["color", "background-color", "border-color", "outline-color"]);
 const camel = (p: string) => p.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 
-export function MotionPanel({ motion, image }: { motion: Motion; image?: string }) {
+export function MotionPanel({ motion, image, canSave = true }: { motion: Motion; image?: string; canSave?: boolean }) {
   const nothing =
     !motion.running.length &&
     !motion.scriptedIdle &&
@@ -78,7 +78,7 @@ export function MotionPanel({ motion, image }: { motion: Motion; image?: string 
       )}
 
       <p className="text-xs text-muted">Clicks aren’t tested, so the website never navigates away while you explore.</p>
-      <SaveAnimation />
+      {canSave && <SaveAnimation />}
     </div>
   );
 }

@@ -10,7 +10,7 @@ Branches: `main` (stable), `develop` (integration), plus one `feature/*` branch 
 | 2 Design inspector ✅ | `feature/browser-inspector` | You understand the selection's colour, type, layout and assets without reading code |
 | 3 Animation inspector ✅ | `feature/animation-engine` | You can see, replay and save animations; observed and reconstructed ones are marked apart |
 | 4 Recreate + customise ✅ | `feature/component-library` | You get a working copy, can compare it with the original, and can tweak it visually |
-| 5 My Board + Library | `feature/collection-board` | Everything saved shows up on the board, with collections and search |
+| 5 My Board + Library ✅ | `feature/collection-board` | Everything saved shows up on the board, with collections and search |
 | 6 Design systems | `feature/design-systems` | Whole-site tokens, plus a `design.md` export |
 | 7 Claude + MCP | `feature/mcp-integration` | Claude Code can search and reuse your library |
 | 8 Refinement | `develop` | Similarity search, responsive inspection, security review |
