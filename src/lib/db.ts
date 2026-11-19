@@ -52,7 +52,7 @@ export function recordWebsite(url: string, title: string) {
  * Saves something to the library. The screenshot goes to data/screenshots/, everything measured on
  * the page goes in `observed`. Returns the new item's id.
  */
-export function saveItem(item: { kind: "animation" | "component"; name: string; sourceUrl?: string; observed: unknown; png?: Buffer }) {
+export function saveItem(item: { kind: "animation" | "component"; name: string; sourceUrl?: string; observed: unknown; inferred?: unknown; png?: Buffer }) {
   const id = randomUUID();
   let thumbnail: string | null = null;
   if (item.png) {
@@ -66,9 +66,9 @@ export function saveItem(item: { kind: "animation" | "component"; name: string; 
       : undefined;
     db()
       .prepare(
-        "INSERT INTO items (id, kind, name, website_id, source_url, thumbnail, observed) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO items (id, kind, name, website_id, source_url, thumbnail, observed, inferred) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       )
-      .run(id, item.kind, item.name, site?.id ?? null, item.sourceUrl ?? null, thumbnail, JSON.stringify(item.observed));
+      .run(id, item.kind, item.name, site?.id ?? null, item.sourceUrl ?? null, thumbnail, JSON.stringify(item.observed), JSON.stringify(item.inferred ?? {}));
   } catch (e) {
     if (thumbnail) fs.rmSync(path.join(dataDir, thumbnail), { force: true }); // no orphan files
     throw e;
@@ -76,7 +76,37 @@ export function saveItem(item: { kind: "animation" | "component"; name: string; 
   return id;
 }
 
-export type RecentWebsite ={ url: string; title: string | null; last_seen: string };
+/** Saves a recreated component: the item, plus its code as version 1 in data/components/<id>/v1/. */
+export function saveComponent(c: {
+  name: string;
+  sourceUrl?: string;
+  png?: Buffer;
+  observed: unknown;
+  inferred: unknown;
+  html: string;
+  react?: string;
+  note?: string;
+}) {
+  const id = saveItem({ kind: "component", name: c.name, sourceUrl: c.sourceUrl, png: c.png, observed: c.observed, inferred: c.inferred });
+  const rel = `components/${id}/v1`;
+  try {
+    fs.mkdirSync(path.join(dataDir, rel), { recursive: true });
+    fs.writeFileSync(path.join(dataDir, rel, "component.html"), c.html);
+    if (c.react) fs.writeFileSync(path.join(dataDir, rel, "Component.tsx"), c.react);
+    db()
+      .prepare("INSERT INTO item_versions (id, item_id, version, framework, code_path, change_note) VALUES (?, ?, 1, ?, ?, ?)")
+      .run(randomUUID(), id, c.react ? "html-css, react" : "html-css", rel, c.note ?? null);
+  } catch (e) {
+    // Don't leave a half-saved component behind.
+    db().prepare("DELETE FROM items WHERE id = ?").run(id);
+    fs.rmSync(path.join(dataDir, "components", id), { recursive: true, force: true });
+    fs.rmSync(path.join(dataDir, "screenshots", `${id}.png`), { force: true });
+    throw e;
+  }
+  return id;
+}
+
+export type RecentWebsite = { url: string; title: string | null; last_seen: string };
 
 export function getHomeData() {
   const d = db();

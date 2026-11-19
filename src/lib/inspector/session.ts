@@ -5,6 +5,7 @@ import { recordWebsite } from "../db.ts";
 import { normaliseUrl } from "../url.ts";
 import { extractDesign, type Design } from "./extract.ts";
 import { motionState, type Anim, type Declared } from "./motion.ts";
+import { snapshotElement } from "./snapshot.ts";
 import { diffStates, newAnimations, type Change } from "./describe.ts";
 
 export type Selection = ElementInfo & {
@@ -304,6 +305,22 @@ async function exploreMotion(id: number) {
     });
   } catch {
     patchSelection(id, { motionStatus: "failed" });
+  } finally {
+    await handle?.dispose().catch(() => undefined);
+  }
+}
+
+/** A frozen copy of the current selection, plus what was already measured about it. */
+export async function captureForRecreation() {
+  const page = s.page;
+  const sel = s.snap.selection;
+  if (!page || !sel) throw new Error("Select something first.");
+  if (!sel.design) throw new Error("Its design is still being read. Try again in a moment.");
+  const handle = await page.evaluateHandle(() => (window as unknown as PdiWindow).__pdi.selected).catch(() => null);
+  const el = handle?.asElement();
+  try {
+    if (!el) throw new Error("The selected element is gone. Select it again.");
+    return { sel: { ...sel, design: sel.design }, url: s.snap.url, snapshot: await el.evaluate(snapshotElement) };
   } finally {
     await handle?.dispose().catch(() => undefined);
   }

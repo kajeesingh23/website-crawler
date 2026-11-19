@@ -14,7 +14,7 @@ process.env.PDI_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "pdi-test-"));
 const { openWebsite, runCommand, getSnapshot, closeWebsite } = await import("../src/lib/inspector/session.ts");
 const { getHomeData } = await import("../src/lib/db.ts");
 const { describeLayout, describeMovement, movementBetween } = await import("../src/lib/inspector/describe.ts");
-const { saveItem } = await import("../src/lib/db.ts");
+const { saveItem, saveComponent, dataDir } = await import("../src/lib/db.ts");
 
 const MOTION_PAGE = `<title>Motion lab</title><style>
   body{margin:0}
@@ -143,6 +143,13 @@ test("motion: hover, looping and scroll-in animations are observed and can be sa
   const id = saveItem({ kind: "animation", name: "Scroll reveal", sourceUrl: getSnapshot().url, observed: { motion: reveal } });
   assert.ok(id);
   assert.equal(getHomeData().animations, 1);
+});
+
+test("a saved component keeps its code as version 1", () => {
+  const id = saveComponent({ name: "Card", html: "<html><div class=\"pdi-root\"></div></html>", react: "export function Card() {}", observed: {}, inferred: { source: "copy" } });
+  assert.ok(fs.existsSync(path.join(dataDir, "components", id, "v1", "component.html")));
+  assert.ok(fs.existsSync(path.join(dataDir, "components", id, "v1", "Component.tsx")));
+  assert.equal(getHomeData().components, 1);
 });
 
 test("bad links never reach the browser", async () => {

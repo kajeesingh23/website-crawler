@@ -7,7 +7,7 @@ they work, and saving them to a personal visual library that Claude can reuse.
 
 ## Status
 
-Phases 1–3 are built: explore a website, select anything, see its design and how it moves. See [docs/ROADMAP.md](docs/ROADMAP.md).
+Phases 1–4 are built: explore a website, select anything, see its design and motion, recreate it as code and make it yours. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Using it
 
@@ -24,6 +24,21 @@ Phases 1–3 are built: explore a website, select anything, see its design and h
    and while scrolling into view (the website window visibly hovers and scrolls). It shows what
    changed, timing and easing in plain words, and a preview with play, pause, replay and speed.
    Name it and **Save animation** to keep it in your library.
+7. **Recreate This Component** turns the selection into reusable code. Without Claude you get an
+   exact copy made from the measurements; with Claude connected you also get clean HTML/CSS and a
+   React version, **Improve the Match**, and changes by instruction. Every version is rendered and
+   measured against the original ("Matches 12 of 13 measured properties"), shown side by side or as
+   an overlay, and can be customised with colour pickers and sliders before you save it.
+
+### Connecting Claude (optional)
+
+Add your key to `.env.local` (copy `.env.example`), then restart `npm run dev`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Requests use your Anthropic account and are billed to it. Everything else works without a key.
 
 ## Install
 

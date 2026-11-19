@@ -10,6 +10,7 @@
     "test": "node --test tests/"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.11.0",
     "next": "16.4.6",
     "playwright": "^1.65.1",
     "react": "19.3.0",

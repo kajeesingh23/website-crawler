@@ -4,8 +4,9 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Command, Snapshot } from "@/lib/inspector/session";
 import { Inspector } from "./Inspector";
 import { MotionPanel } from "./Motion";
+import { RecreatePanel } from "./Recreate";
 
-const NEXT_UP = ["Save assets", "Recreate component", "Save components to the library"];
+const NEXT_UP = ["Save assets", "Browse and organise everything on My Board"];
 
 export function Explorer({ initialUrl }: { initialUrl?: string }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
@@ -187,6 +188,8 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
                   </div>
                 )}
               </section>
+
+              <RecreatePanel key={sel.id} sel={sel} />
 
               {sel.design ? (
                 <Inspector design={sel.design} sample={sel.text.slice(0, 80)} />
