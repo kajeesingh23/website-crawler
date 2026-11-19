@@ -37,6 +37,8 @@ const s: Session = (g.__pdiSession ??= {
   bus: new EventEmitter(),
   seq: 0,
 });
+// After a code update the kept selection may be missing newer fields; it is cheap to select again.
+s.snap = { ...s.snap, selection: null };
 
 function set(patch: Partial<Snapshot>) {
   s.snap = { ...s.snap, ...patch };
@@ -159,9 +161,14 @@ async function capture(id: number) {
 export async function selectBySelector(css: string): Promise<boolean> {
   const page = s.page;
   if (!page) throw new Error("Open a website first.");
-  return page
-    .evaluate((c) => (window as unknown as { __pdi?: { selectCss(c: string): boolean } }).__pdi?.selectCss(c) ?? false, css)
+  const result = await page
+    .evaluate((c) => {
+      const api = (window as unknown as { __pdi?: { selectCss?(c: string): boolean } }).__pdi;
+      return typeof api?.selectCss === "function" ? api.selectCss(c) : "outdated";
+    }, css)
     .catch(() => false);
+  if (result === "outdated") throw new Error("This page was opened before an app update. Close the website and explore it again.");
+  return result;
 }
 
 export async function runCommand(cmd: Command) {

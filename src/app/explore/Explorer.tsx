@@ -153,10 +153,9 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
                     <h3 className="font-display text-2xl">Animation</h3>
                     {sel.design && sel.motionStatus !== "done" && (
                       <p className="text-sm text-muted">
-                        {/* motion may be missing on a selection made before an app update */}
-                        {(sel.design.motion?.moving ?? 0) > 0
+                        {sel.design.motion.moving > 0
                           ? "Something here is moving right now."
-                          : (sel.design.motion?.smooth ?? 0) > 0
+                          : sel.design.motion.smooth > 0
                             ? "This is set up to change smoothly, probably on hover or scroll."
                             : "No motion spotted yet. Exploring checks hover, focus and scrolling."}
                       </p>
