@@ -6,18 +6,29 @@ export function GET(req: Request) {
   let stop = () => {};
   const stream = new ReadableStream({
     start(controller) {
-      const send = (snap: Snapshot) => controller.enqueue(enc.encode(`data: ${JSON.stringify(snap)}\n\n`));
-      send(getSnapshot());
-      const unsubscribe = subscribe(send);
-      const ping = setInterval(() => controller.enqueue(enc.encode(": ping\n\n")), 15_000);
+      // A closed tab can both abort the request and cancel the stream; writing after either throws.
+      let closed = false;
+      const write = (text: string) => {
+        if (closed) return;
+        try {
+          controller.enqueue(enc.encode(text));
+        } catch {
+          stop();
+        }
+      };
+      write(`data: ${JSON.stringify(getSnapshot())}\n\n`);
+      const unsubscribe = subscribe((snap: Snapshot) => write(`data: ${JSON.stringify(snap)}\n\n`));
+      const ping = setInterval(() => write(": ping\n\n"), 15_000);
       stop = () => {
+        if (closed) return;
+        closed = true;
         unsubscribe();
         clearInterval(ping);
+        try {
+          controller.close();
+        } catch {}
       };
-      req.signal.addEventListener("abort", () => {
-        stop();
-        controller.close();
-      });
+      req.signal.addEventListener("abort", () => stop());
     },
     cancel: () => stop(),
   });

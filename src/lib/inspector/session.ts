@@ -3,10 +3,9 @@ import { EventEmitter } from "node:events";
 import { overlay, type ElementInfo, type PageEvent } from "./overlay.ts";
 import { recordWebsite } from "../db.ts";
 import { normaliseUrl } from "../url.ts";
+import { extractDesign, type Design } from "./extract.ts";
 
-export { normaliseUrl };
-
-export type Selection = ElementInfo & { id: number; screenshot?: string };
+export type Selection = ElementInfo & { id: number; screenshot?: string; design?: Design; designFailed?: boolean };
 
 export type Snapshot = {
   status: "idle" | "opening" | "open" | "closed" | "error";
@@ -115,22 +114,35 @@ function onPageEvent(ev: PageEvent) {
   }
 }
 
-/** Screenshot of just the selected element, with our outline hidden. */
+type PdiWindow = { __pdi: { selected: Element; showOverlay(v: boolean): void } };
+
+// Only update the selection if the user hasn't picked something else meanwhile.
+function patchSelection(id: number, patch: Partial<Selection>) {
+  if (s.snap.selection?.id === id) set({ selection: { ...s.snap.selection, ...patch } });
+}
+
+/** Reads the selected element's design, then takes a screenshot of just that element. */
 async function capture(id: number) {
   const page = s.page;
   if (!page) return;
+  const handle = await page.evaluateHandle(() => (window as unknown as PdiWindow).__pdi.selected).catch(() => null);
+  const el = handle?.asElement();
   try {
-    const handle = await page.evaluateHandle(() => (window as unknown as { __pdi: { selected: Element } }).__pdi.selected);
-    const el = handle.asElement();
     if (!el) return;
-    await page.evaluate(() => (window as unknown as { __pdi: { showOverlay(v: boolean): void } }).__pdi.showOverlay(false));
-    const png = await el.screenshot({ timeout: 5_000 }).finally(() =>
-      page.evaluate(() => (window as unknown as { __pdi: { showOverlay(v: boolean): void } }).__pdi.showOverlay(true)),
-    );
-    if (s.snap.selection?.id === id)
-      set({ selection: { ...s.snap.selection, screenshot: `data:image/png;base64,${png.toString("base64")}` } });
+    try {
+      patchSelection(id, { design: await el.evaluate(extractDesign) });
+    } catch {
+      patchSelection(id, { designFailed: true });
+    }
+    await page.evaluate(() => (window as unknown as PdiWindow).__pdi.showOverlay(false));
+    const png = await el
+      .screenshot({ timeout: 5_000 })
+      .finally(() => page.evaluate(() => (window as unknown as PdiWindow).__pdi.showOverlay(true)));
+    patchSelection(id, { screenshot: `data:image/png;base64,${png.toString("base64")}` });
   } catch {
     // Element vanished or is off-screen: the selection still works, just without a preview.
+  } finally {
+    await handle?.dispose().catch(() => undefined);
   }
 }
 

@@ -10,6 +10,7 @@ export type ElementInfo = {
   height: number;
   hasParent: boolean;
   hasChild: boolean;
+  path: string[]; // plain-language ancestors, outermost first, e.g. ["Page", "Navigation"]
 };
 
 export type PageEvent =
@@ -63,13 +64,14 @@ export function overlay() {
     const tag = el.tagName.toLowerCase();
     const role = el.getAttribute("role");
     const r = el.getBoundingClientRect();
-    const hasText = !!el.textContent?.trim();
+    const hasText = () => !!el.textContent?.trim(); // lazy: large sections have a lot of text
+    if (tag === "body") return "Page";
     if (tag === "iframe") return "Embedded frame";
     if (tag === "nav" || role === "navigation") return "Navigation";
     if (tag === "header" || role === "banner") return "Header";
     if (tag === "footer" || role === "contentinfo") return "Footer";
     if (tag === "button" || role === "button") return "Button";
-    if (tag === "a") return hasText ? "Link" : "Image link";
+    if (tag === "a") return hasText() ? "Link" : "Image link";
     if (/^h[1-6]$/.test(tag)) return "Heading";
     if (tag === "p") return "Paragraph";
     if (tag === "img" || tag === "picture") return "Image";
@@ -83,7 +85,7 @@ export function overlay() {
     if (["section", "article", "main", "aside"].includes(tag)) return "Section";
     if (["span", "label", "strong", "em", "small", "b", "i"].includes(tag)) return "Text";
     if (getComputedStyle(el).backgroundImage.includes("url(")) return "Image block";
-    if (el.children.length === 0 && hasText) return "Text";
+    if (el.children.length === 0 && hasText()) return "Text";
     if (r.width >= innerWidth * 0.9 && r.height >= 200) return "Section";
     if (el.children.length > 1) return "Group";
     return "Box";
@@ -102,7 +104,11 @@ export function overlay() {
     const r = el.getBoundingClientRect();
     const h = el as HTMLElement;
     const text = (h.innerText ?? el.textContent ?? "").trim().replace(/\s+/g, " ");
+    const path: string[] = [];
+    for (let p = el.parentElement; p && p !== document.documentElement && path.length < 5; p = p.parentElement)
+      path.unshift(label(p));
     return {
+      path,
       label: label(el),
       note: note(el),
       tag: el.tagName.toLowerCase(),
@@ -215,8 +221,9 @@ export function overlay() {
       hovered = pick(e.clientX, e.clientY);
       draw(hoverBox, hovered);
       if (!hovered) return void (tip.style.display = "none");
-      const i = info(hovered);
-      tip.textContent = `${i.label} · ${i.width} × ${i.height}`;
+      // Only the cheap parts here: this runs on every mouse move.
+      const r = hovered.getBoundingClientRect();
+      tip.textContent = `${label(hovered)} · ${Math.round(r.width)} × ${Math.round(r.height)}`;
       Object.assign(tip.style, {
         display: "block",
         left: `${Math.min(e.clientX + 14, innerWidth - 240)}px`,

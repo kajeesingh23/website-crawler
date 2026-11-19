@@ -7,7 +7,7 @@ they work, and saving them to a personal visual library that Claude can reuse.
 
 ## Status
 
-Phase 1 (Explore + visual selection) is built. See [docs/ROADMAP.md](docs/ROADMAP.md).
+Phases 1–2 are built: explore a website, select anything, and see its design. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Using it
 
@@ -17,6 +17,9 @@ Phase 1 (Explore + visual selection) is built. See [docs/ROADMAP.md](docs/ROADMA
    Hover to see what each part is. Click to pick it.
 4. The app shows a preview, a plain-language name and its size. Use **Select larger area**,
    **Select inside**, **Previous** and **Next** to adjust. Press Esc on the website to clear.
+5. Below the preview, the design inspector shows what was measured on the page: colours
+   (click to copy), typography with a live preview, layout in plain words with a spacing
+   diagram, all colours used inside, and its images, icons and videos.
 
 ## Install
 

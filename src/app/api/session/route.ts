@@ -1,4 +1,5 @@
-import { closeWebsite, getSnapshot, normaliseUrl, openWebsite } from "@/lib/inspector/session";
+import { closeWebsite, getSnapshot, openWebsite } from "@/lib/inspector/session";
+import { normaliseUrl } from "@/lib/url";
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { url?: unknown };

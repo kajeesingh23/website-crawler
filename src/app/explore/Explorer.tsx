@@ -2,16 +2,9 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Command, Snapshot } from "@/lib/inspector/session";
+import { Inspector } from "./Inspector";
 
-const NEXT_UP = [
-  "Inspect design",
-  "Explore animation",
-  "View colours",
-  "View typography",
-  "Capture asset",
-  "Recreate component",
-  "Save to library",
-];
+const NEXT_UP = ["Explore animation", "Save assets", "Recreate component", "Save to library"];
 
 export function Explorer({ initialUrl }: { initialUrl?: string }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
@@ -135,7 +128,8 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
                   <span className="text-sm text-muted">Capturing preview…</span>
                 )}
               </div>
-              <div className="mt-5 flex items-baseline justify-between gap-4">
+              {sel.path.length > 0 && <p className="mt-5 truncate text-xs text-muted">{sel.path.join(" › ")}</p>}
+              <div className="mt-1 flex items-baseline justify-between gap-4">
                 <h2 className="text-2xl font-medium">{sel.label}</h2>
                 <span className="shrink-0 text-sm tabular-nums text-muted">
                   {sel.width} × {sel.height}
@@ -152,7 +146,15 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
                 <Chip onClick={() => send("clear")}>Clear</Chip>
               </div>
 
-              <div className="mt-8 border-t border-line pt-5">
+              {sel.design ? (
+                <Inspector design={sel.design} sample={sel.text.slice(0, 80)} />
+              ) : (
+                <p className="mt-8 text-sm text-muted">
+                  {sel.designFailed ? "This element's design couldn't be read. Try selecting the area around it." : "Reading the design…"}
+                </p>
+              )}
+
+              <div className="mt-10 border-t border-line pt-5">
                 <h3 className="text-sm font-medium">Coming in the next phases</h3>
                 <p className="mt-2 text-sm text-muted">{NEXT_UP.join(" · ")}</p>
               </div>
