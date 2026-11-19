@@ -7,7 +7,7 @@ they work, and saving them to a personal visual library that Claude can reuse.
 
 ## Status
 
-Phases 1–6 are built: explore a website, select anything, see its design and motion, recreate it as code, make it yours, keep everything on your board, and collect whole design systems. See [docs/ROADMAP.md](docs/ROADMAP.md).
+Phases 1–7 are built: explore a website, select anything, see its design and motion, recreate it as code, make it yours, keep everything on your board, collect whole design systems, and let Claude Code reuse it all. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Using it
 
@@ -44,6 +44,46 @@ Phases 1–6 are built: explore a website, select anything, see its design and m
     buttons, cards, navigation and forms. Untick what you don't want, then **Download design.md** or
     **Save to library**. Each saved system is an independent reference; nothing is merged.
 
+## Using your library from Claude Code
+
+The project includes a local MCP server (`mcp/server.ts`) that lets Claude Code search and reuse
+your library. It runs on your computer only and never goes on the internet.
+
+1. Open Claude Code **in this folder** (`website-crawler`). It finds `.mcp.json` and asks once
+   whether to allow the `design-library` server. Say yes.
+2. Ask in plain words, for example:
+   - "Find my best navigation animations."
+   - "Retrieve the magnetic button I saved and make a React version for this project."
+   - "Compare my three hero sections."
+   - "Use my saved typography system in this page."
+   - "Combine the navigation from one reference with the card style of another."
+
+What Claude can do with it:
+
+| Tool | What it does | Changes anything? |
+|---|---|---|
+| `search_library` | Find items in plain words, by filter, collection or tag | No |
+| `get_item` | Everything about one item: tokens, motion, recreation, notes, files | No |
+| `get_code` | A component's HTML/CSS and React code | No |
+| `get_animation` | How it moves: on its own, hover, focus, scroll, with timing | No |
+| `get_design_tokens` | A design system's `design.md`, or a component's tokens | No |
+| `get_assets` | Images, icons, fonts, screenshots (with a licence reminder) | No |
+| `get_preview` | The item's screenshot, so Claude can look at it | No |
+| `compare_items` | 2–4 items side by side | No |
+| `list_collections` | Your collections | No |
+| `save_variation` | Saves new code as a **new** item; the original is never changed | Adds, after you agree |
+| `update_item` | Name, notes, tags, favourite | Edits, after you agree |
+| `add_to_collection` | Adds items to a (new) collection | Edits, after you agree |
+
+Changing tools refuse to run unless Claude confirms you agreed, and Claude Code also asks you
+before using them. There is no delete tool: deleting stays in the app.
+
+To use the library from Claude Code in **any** folder, register it once:
+
+```bash
+claude mcp add design-library --scope user -- node --no-warnings ~/Desktop/design_system_research/website-crawler/mcp/server.ts
+```
+
 ### Connecting Claude (optional)
 
 Add your key to `.env.local` (copy `.env.example`), then restart `npm run dev`:
@@ -71,7 +111,8 @@ npm run dev                  # http://localhost:3000
 |---|---|---|
 | `src/` | The app (Next.js) | yes |
 | `db/migrations/` | Database schema | yes |
-| `mcp/` | Local MCP server for Claude Code (Phase 7) | yes |
+| `mcp/` | Local MCP server for Claude Code | yes |
+| `.mcp.json` | Tells Claude Code how to start it | yes |
 | `docs/` | Architecture and roadmap | yes |
 | `data/` | **Your** library: database, screenshots, assets, code | **no**, never |
 | `.env.local` | Your keys | **no**, never |
