@@ -7,7 +7,7 @@ they work, and saving them to a personal visual library that Claude can reuse.
 
 ## Status
 
-Phases 1–5 are built: explore a website, select anything, see its design and motion, recreate it as code, make it yours, and keep everything on your board. See [docs/ROADMAP.md](docs/ROADMAP.md).
+Phases 1–6 are built: explore a website, select anything, see its design and motion, recreate it as code, make it yours, keep everything on your board, and collect whole design systems. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Using it
 
@@ -37,6 +37,12 @@ Phases 1–5 are built: explore a website, select anything, see its design and m
    animation, code (copy or export), notes, tags and version history.
 9. **Design Library** searches everything in your own words ("dark navigation", "buttons that
    follow the cursor") and filters by website, kind, tag and date.
+
+10. **Design Systems** collects a whole website's design language in a background browser (your
+    Explore window isn't touched): colours with likely roles, type scale and fonts, spacing scale,
+    corners, shadows, layout and content widths, breakpoints, motion, and photographed examples of
+    buttons, cards, navigation and forms. Untick what you don't want, then **Download design.md** or
+    **Save to library**. Each saved system is an independent reference; nothing is merged.
 
 ### Connecting Claude (optional)
 

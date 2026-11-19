@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { dataDir, db } from "./db.ts";
+import { dataDir, db, saveItem } from "./db.ts";
+import type { SystemData } from "./system/extract-system.ts";
+import { designMd } from "./system/design-md.ts";
 import { describeLayout, describeMovement, movementBetween } from "./inspector/describe.ts";
 import type { Selection } from "./inspector/session.ts";
 
@@ -126,7 +128,7 @@ export function listCollections() {
   return db()
     .prepare(
       `SELECT c.id, c.name, COUNT(ci.item_id) AS count FROM collections c
-       LEFT JOIN collection_items ci ON ci.collection_id = c.id GROUP BY c.id ORDER BY c.created_at DESC`,
+       LEFT JOIN collection_items ci ON ci.collection_id = c.id GROUP BY c.id ORDER BY c.created_at DESC, c.rowid DESC`,
     )
     .all() as { id: string; name: string; count: number }[];
 }
@@ -181,9 +183,12 @@ export function getItem(id: string): ItemDetail | null {
   };
 }
 
-/** A file from the library folder, refusing anything outside screenshots/ and components/. */
+// Folders the app may serve files from; everything else in data/ (the database above all) stays private.
+const FILE_DIRS = ["screenshots", "components", "design-systems"];
+
+/** A file from the library folder, refusing anything outside FILE_DIRS. */
 export function resolveDataFile(parts: string[]): string | null {
-  if (!["screenshots", "components"].includes(parts[0] ?? "")) return null;
+  if (!FILE_DIRS.includes(parts[0] ?? "")) return null;
   // Check where the path really ends up, so "screenshots/../database" can't escape.
   const base = path.join(dataDir, parts[0]);
   const abs = path.resolve(dataDir, ...parts);
@@ -273,7 +278,7 @@ export function deleteItems(ids: string[]) {
   });
   for (const id of ids) {
     fs.rmSync(path.join(dataDir, "screenshots", `${id}.png`), { force: true });
-    fs.rmSync(path.join(dataDir, "components", id), { recursive: true, force: true });
+    for (const dir of ["components", "design-systems"]) fs.rmSync(path.join(dataDir, dir, id), { recursive: true, force: true });
   }
 }
 
@@ -290,7 +295,8 @@ export function duplicateItem(id: string): string {
   const copy = randomUUID();
   const thumbnail = src.thumbnail ? `screenshots/${copy}.png` : null;
   if (thumbnail && fs.existsSync(path.join(dataDir, src.thumbnail!))) fs.copyFileSync(path.join(dataDir, src.thumbnail!), path.join(dataDir, thumbnail));
-  if (fs.existsSync(path.join(dataDir, "components", id))) fs.cpSync(path.join(dataDir, "components", id), path.join(dataDir, "components", copy), { recursive: true });
+  for (const dir of ["components", "design-systems"])
+    if (fs.existsSync(path.join(dataDir, dir, id))) fs.cpSync(path.join(dataDir, dir, id), path.join(dataDir, dir, copy), { recursive: true });
   normaliseOrder();
   const order = (db().prepare("SELECT board_order FROM items WHERE id = ?").get(id) as { board_order: number }).board_order;
   tx(() => {
@@ -306,7 +312,7 @@ export function duplicateItem(id: string): string {
         `INSERT INTO item_versions (id, item_id, version, framework, code_path, change_note)
          SELECT lower(hex(randomblob(16))), ?, version, framework, replace(code_path, ?, ?), change_note FROM item_versions WHERE item_id = ?`,
       )
-      .run(copy, `components/${id}/`, `components/${copy}/`, id);
+      .run(copy, `/${id}/`, `/${copy}/`, id);
   });
   return copy;
 }
@@ -352,4 +358,46 @@ export function removeFromCollection(collectionId: string, ids: string[]) {
   tx(() => {
     for (const id of ids) db().prepare("DELETE FROM collection_items WHERE collection_id = ? AND item_id = ?").run(collectionId, id);
   });
+}
+
+/**
+ * Saves a collected design system as its own, independent reference: the page screenshot as its
+ * thumbnail, example screenshots and design.md in data/design-systems/<id>/.
+ */
+export function saveDesignSystem(c: { name: string; system: SystemData; pageShot?: Buffer; shots: (Buffer | null)[] }): string {
+  const s = c.system;
+  const host = new URL(s.url).hostname.replace(/^www\./, "");
+  const id = saveItem({
+    kind: "design_system",
+    name: c.name,
+    sourceUrl: s.url,
+    png: c.pageShot,
+    observed: {},
+    category: "Design system",
+    tags: ["design system", host, ...s.fonts.map((f) => f.family.toLowerCase())],
+    description: `Design system from ${host} · ${s.colours.length} colours, ${s.type.length} text styles, ${s.spacing.length} spacing steps, ${s.examples.length} component examples`,
+  });
+  const rel = `design-systems/${id}`;
+  try {
+    fs.mkdirSync(path.join(dataDir, rel), { recursive: true });
+    const examples = s.examples.map((e, i) => {
+      const shot = c.shots[i];
+      if (!shot) return e;
+      const image = `example-${i + 1}.png`;
+      fs.writeFileSync(path.join(dataDir, rel, image), shot);
+      return { ...e, image };
+    });
+    const saved = { ...s, examples };
+    fs.writeFileSync(path.join(dataDir, rel, "design.md"), designMd(saved));
+    tx(() => {
+      db().prepare("UPDATE items SET observed = ? WHERE id = ?").run(JSON.stringify({ system: saved }), id);
+      db()
+        .prepare("INSERT INTO item_versions (id, item_id, version, framework, code_path, change_note) VALUES (?, ?, 1, 'design.md', ?, 'Collected')")
+        .run(randomUUID(), id, rel);
+    });
+  } catch (e) {
+    deleteItems([id]);
+    throw e;
+  }
+  return id;
 }

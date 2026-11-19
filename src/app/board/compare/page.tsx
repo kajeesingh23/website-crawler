@@ -50,7 +50,7 @@ async function Compare({ searchParams }: Pick<PageProps<"/board/compare">, "sear
   const m = (i: ItemDetail) => i.observed.motion as Motion | undefined;
   const rows: [string, (i: ItemDetail) => ReactNode][] = [
     ["Website", (i) => i.site ?? "—"],
-    ["Kind", (i) => [i.kind === "animation" ? "Animation" : "Component", i.category].filter(Boolean).join(" · ")],
+    ["Kind", (i) => (i.kind === "design_system" ? "Design system" : [i.kind === "animation" ? "Animation" : "Component", i.category].filter(Boolean).join(" · "))],
     ["Background", (i) => swatch(d(i)?.appearance.background ?? d(i)?.appearance.sitsOn)],
     ["Text colour", (i) => swatch(d(i)?.appearance.text)],
     ["Font", (i) => d(i)?.typography.family ?? "—"],

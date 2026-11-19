@@ -10,6 +10,8 @@ import type { Motion } from "@/lib/inspector/session";
 import { Inspector } from "@/app/explore/Inspector";
 import { MotionPanel } from "@/app/explore/Motion";
 import { day, thumb } from "@/app/board/Board";
+import { SystemView } from "@/components/SystemView";
+import type { SystemData } from "@/lib/system/extract-system";
 
 const webUrl = (u: string | null) => (u && /^https?:\/\//i.test(u) ? u : undefined);
 
@@ -26,6 +28,7 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
 
   const design = item.observed.design as Design | undefined;
   const motion = item.observed.motion as Motion | undefined;
+  const system = item.observed.system as SystemData | undefined;
   const inferred = item.inferred as { source?: string; confidence?: number; unknowns?: string[]; notes?: string; compare?: { match: boolean }[] };
   const latest = item.versions[0];
   const source = webUrl(item.sourceUrl);
@@ -50,7 +53,7 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
               className="w-full rounded-lg bg-transparent font-display text-4xl tracking-tight outline-none focus:bg-surface md:text-5xl"
             />
             <p className="mt-1 text-sm text-muted">
-              {[item.kind === "animation" ? "Animation" : "Component", item.category].filter(Boolean).join(" · ")} · saved {day(item.createdAt)}
+              {item.kind === "design_system" ? "Design system" : [item.kind === "animation" ? "Animation" : "Component", item.category].filter(Boolean).join(" · ")} · saved {day(item.createdAt)}
               {source && (
                 <>
                   {" · from "}
@@ -125,6 +128,12 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
           <span className="mt-1 block text-xs text-muted">Separate with commas. Tags make it easier to find later.</span>
         </label>
       </section>
+
+      {system && (
+        <Block title="Design system">
+          <SystemView system={system} images={system.examples.map((e) => e.image && `/api/library/files/design-systems/${item.id}/${e.image}`)} />
+        </Block>
+      )}
 
       {motion && (
         <Block title="Animation">

@@ -109,7 +109,7 @@ async function Library({ searchParams }: Pick<PageProps<"/library">, "searchPara
                   <div className="truncate text-sm text-muted">{i.description ?? [i.category, i.site].filter(Boolean).join(" · ")}</div>
                   {i.tags.length > 0 && <div className="mt-1 truncate text-xs text-muted">{i.tags.join(" · ")}</div>}
                 </div>
-                <span className="shrink-0 text-xs text-muted">{i.kind === "animation" ? "Animation" : "Component"}</span>
+                <span className="shrink-0 text-xs text-muted">{{ animation: "Animation", component: "Component", design_system: "Design system" }[i.kind] ?? i.kind}</span>
               </Link>
             </li>
           ))}

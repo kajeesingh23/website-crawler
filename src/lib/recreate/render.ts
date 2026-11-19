@@ -4,7 +4,8 @@ import { extractDesign, type Design } from "../inspector/extract.ts";
 // A separate, invisible browser: recreations never run inside the website's window or this app.
 const g = globalThis as typeof globalThis & { __pdiRenderer?: Promise<Browser> };
 
-async function browser() {
+/** The shared invisible browser (also used to collect design systems). */
+export async function browser(): Promise<Browser> {
   const b = await (g.__pdiRenderer ??= chromium.launch({ headless: true }));
   if (b.isConnected()) return b;
   g.__pdiRenderer = undefined;

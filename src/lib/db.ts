@@ -53,7 +53,7 @@ export function recordWebsite(url: string, title: string) {
  * the page goes in `observed`. Returns the new item's id.
  */
 export function saveItem(item: {
-  kind: "animation" | "component";
+  kind: "animation" | "component" | "design_system";
   name: string;
   sourceUrl?: string;
   observed: unknown;
