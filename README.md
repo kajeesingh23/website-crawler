@@ -7,8 +7,16 @@ they work, and saving them to a personal visual library that Claude can reuse.
 
 ## Status
 
-Foundation only: the project scaffold, database schema and architecture are in place.
-See [docs/ROADMAP.md](docs/ROADMAP.md).
+Phase 1 (Explore + visual selection) is built. See [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Using it
+
+1. `npm run dev`, then open http://localhost:3000 and choose **Explore Website**.
+2. Paste a link. The website opens in its own browser window, working exactly as it normally does.
+3. Press **Start selecting** (in the app, or the pill at the bottom right of the website).
+   Hover to see what each part is. Click to pick it.
+4. The app shows a preview, a plain-language name and its size. Use **Select larger area**,
+   **Select inside**, **Previous** and **Next** to adjust. Press Esc on the website to clear.
 
 ## Install
 
@@ -16,6 +24,7 @@ Requires Node.js 22.5+ (for the built-in `node:sqlite`).
 
 ```bash
 npm install
+npx playwright install chromium   # one-time: the browser used for exploring
 cp .env.example .env.local   # optional: add an Anthropic API key
 npm run dev                  # http://localhost:3000
 ```
@@ -32,6 +41,12 @@ npm run dev                  # http://localhost:3000
 | `.env.local` | Your keys | **no**, never |
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) to learn how the app inspects websites.
+
+## Tests
+
+```bash
+npm test   # opens test pages in an invisible browser; your library is never touched
+```
 
 ## Troubleshooting
 

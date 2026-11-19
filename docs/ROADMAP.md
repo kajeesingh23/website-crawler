@@ -6,7 +6,7 @@ Branches: `main` (stable), `develop` (integration), plus one `feature/*` branch 
 | Phase | Branch | Success when… |
 |---|---|---|
 | 0 Foundation ✅ | `main` | Repo, scaffold, schema, docs |
-| 1 Foundation app | `feature/browser-inspector` | Paste a URL, the site opens, hover and click to select an element |
+| 1 Foundation app ✅ | `feature/browser-inspector` | Paste a URL, the site opens, hover and click to select an element |
 | 2 Design inspector | `feature/browser-inspector` | You understand the selection's colour, type, layout and assets without reading code |
 | 3 Animation inspector | `feature/animation-engine` | You can see, replay and save animations; observed and reconstructed ones are marked apart |
 | 4 Recreate + customise | `feature/component-library` | You get a working copy, can compare it with the original, and can tweak it visually |
