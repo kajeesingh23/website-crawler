@@ -6,6 +6,7 @@ import { snapshotElement } from "../src/lib/inspector/snapshot.ts";
 import { extractDesign } from "../src/lib/inspector/extract.ts";
 import { applyOverrides, buildDocument, compareDesigns, overridesCss, parseReply, pngSize } from "../src/lib/recreate/document.ts";
 import { renderAndMeasure } from "../src/lib/recreate/render.ts";
+import { visualMatch } from "../src/lib/visual/index.ts";
 
 after(async () => (await (globalThis as unknown as { __pdiRenderer?: Promise<{ close(): Promise<void> }> }).__pdiRenderer)?.close());
 
@@ -36,6 +37,8 @@ test("an exact copy matches the original when measured", { timeout: 30_000 }, as
     const rows = compareDesigns(original, design);
     const misses = rows.filter((r) => !r.match).map((r) => `${r.label}: ${r.original} vs ${r.recreated}`);
     assert.deepEqual(misses, [], "every measured property should match");
+    const looks = await visualMatch(await card.screenshot(), png);
+    assert.ok(looks >= 95, `the copy should look the same pixel by pixel (got ${looks}%)`);
 
     // Studio settings reach every part through the shared variables.
     const tuned = await renderAndMeasure(applyOverrides(html, { bg: "#0b1f3a", text: "#ffffff", space: 2, typeScale: 1.2 }), original.layout.width);

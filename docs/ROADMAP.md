@@ -13,4 +13,4 @@ Branches: `main` (stable), `develop` (integration), plus one `feature/*` branch 
 | 5 My Board + Library ✅ | `feature/collection-board` | Everything saved shows up on the board, with collections and search |
 | 6 Design systems ✅ | `feature/design-systems` | Whole-site tokens, plus a `design.md` export |
 | 7 Claude + MCP ✅ | `feature/mcp-integration` | Claude Code can search and reuse your library |
-| 8 Refinement | `develop` | Similarity search, responsive inspection, security review |
+| 8 Refinement ✅ | `develop` | Similarity search, responsive inspection, security review |

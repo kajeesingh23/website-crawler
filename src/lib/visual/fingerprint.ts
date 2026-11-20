@@ -1,9 +1,9 @@
 // fingerprintInPage and compareInPage run INSIDE a browser page (page.evaluate): self-contained.
 // similarity() is plain code that compares two fingerprints.
 
-export type Fingerprint = { hash: string; hist: number[] };
+export type Fingerprint = { hash: string; fg: number[]; bg: number[] }; // shape bits, foreground and background colour
 
-/** A picture's shape (64-bit difference hash) and colour mix (64-colour histogram). */
+/** A picture's shape (64-bit difference hash), its main foreground colour and its background colour. */
 export async function fingerprintInPage(dataUrl: string): Promise<Fingerprint> {
   const img = new Image();
   img.src = dataUrl;
@@ -28,9 +28,22 @@ export async function fingerprintInPage(dataUrl: string): Promise<Fingerprint> {
   ctx.fillRect(0, 0, 32, 32);
   ctx.drawImage(img, 0, 0, 32, 32);
   const p = ctx.getImageData(0, 0, 32, 32).data;
-  const hist = new Array<number>(64).fill(0);
-  for (let i = 0; i < p.length; i += 4) hist[(p[i] >> 6) * 16 + (p[i + 1] >> 6) * 4 + (p[i + 2] >> 6)]++;
-  return { hash: BigInt(`0b${bits}`).toString(16).padStart(16, "0"), hist: hist.map((v) => Math.round((v / 1024) * 1000) / 1000) };
+  // The corners show the background; everything clearly different from it is foreground.
+  const at = (i: number) => [p[i], p[i + 1], p[i + 2]];
+  const corners = [0, 31 * 4, 31 * 32 * 4, (32 * 32 - 1) * 4].map(at);
+  const bg = [0, 1, 2].map((k) => Math.round(corners.reduce((s, c) => s + c[k], 0) / 4));
+  const sum = [0, 0, 0];
+  let n = 0;
+  for (let i = 0; i < p.length; i += 4) {
+    const [r, g, b] = at(i);
+    if (Math.hypot(r - bg[0], g - bg[1], b - bg[2]) < 48) continue;
+    sum[0] += r;
+    sum[1] += g;
+    sum[2] += b;
+    n++;
+  }
+  const fg = n ? sum.map((v) => Math.round(v / n)) : bg;
+  return { hash: BigInt(`0b${bits}`).toString(16).padStart(16, "0"), fg, bg };
 }
 
 /** How alike two pictures look pixel by pixel, 0–100, after scaling both to the same box. */
@@ -61,10 +74,10 @@ export async function compareInPage([a, b]: [string, string]): Promise<number> {
   return Math.round((1 - diff / ((pa.length / 4) * 3 * 255)) * 100);
 }
 
-/** 0–1: half shape (hash bits that agree), half colour mix (histogram overlap). */
+/** 0–1: 40% shape (hash bits that agree), 40% foreground colour, 20% background colour. */
 export function similarity(a: Fingerprint, b: Fingerprint): number {
   const differing = (BigInt(`0x${a.hash}`) ^ BigInt(`0x${b.hash}`)).toString(2).replace(/0/g, "").length;
   const shape = 1 - differing / 64;
-  const colour = a.hist.reduce((sum, v, i) => sum + Math.min(v, b.hist[i] ?? 0), 0);
-  return Math.round((0.5 * shape + 0.5 * colour) * 100) / 100;
+  const near = (x: number[], y: number[]) => 1 - Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]) / Math.hypot(255, 255, 255);
+  return Math.round((0.4 * shape + 0.4 * near(a.fg, b.fg) + 0.2 * near(a.bg, b.bg)) * 100) / 100;
 }

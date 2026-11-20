@@ -4,7 +4,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import type { Selection } from "@/lib/inspector/session";
 import { FONTS, SHADOWS, applyOverrides, type CompareRow, type Overrides, type Recreation } from "@/lib/recreate/document";
 
-type Version = Recreation & { source: "copy" | "claude" | "improve" | "edit"; compare: CompareRow[]; screenshot: string };
+type Version = Recreation & { source: "copy" | "claude" | "improve" | "edit"; compare: CompareRow[]; screenshot: string; visual?: number };
 
 const LABEL: Record<Version["source"], string> = {
   copy: "Exact copy",
@@ -213,6 +213,7 @@ function Match({ v }: { v: Version }) {
         <p className="text-lg">
           Matches <strong className="font-medium">{hits} of {v.compare.length}</strong> measured properties
         </p>
+        {v.visual !== undefined && <p className="text-sm">Looks {v.visual}% the same, pixel by pixel</p>}
         {v.confidence !== undefined && <p className="text-sm text-muted">Claude’s own estimate: {v.confidence}% close</p>}
       </div>
       <p className="text-xs text-muted">Both sides are measured the same way, on real rendered pages. It’s not a pixel-perfect guarantee.</p>

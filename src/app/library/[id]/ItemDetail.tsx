@@ -167,6 +167,8 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
         </Block>
       )}
 
+      <Similar id={item.id} />
+
       {item.versions.length > 0 && (
         <Block title="Version history">
           <ol className="space-y-2 text-sm">
@@ -299,6 +301,49 @@ function Code({ html, react }: { html?: string; react?: string }) {
         </button>
       </div>
       <pre className="max-h-96 overflow-auto rounded-xl bg-bg p-4 font-mono text-xs">{code}</pre>
+    </Block>
+  );
+}
+
+type SimilarCard = { id: string; name: string; thumbnail: string | null; score: number; site: string | null };
+
+/** Items that look like this one, by shape and colour of their screenshots. */
+function Similar({ id }: { id: string }) {
+  const [state, setState] = useState<{ busy?: boolean; items?: SimilarCard[]; error?: string }>({});
+  const load = async () => {
+    setState({ busy: true });
+    const res = await fetch(`/api/library/similar?id=${encodeURIComponent(id)}`).catch(() => null);
+    const json = await res?.json().catch(() => null);
+    setState(res?.ok ? { items: json.items } : { error: json?.error ?? "Couldn't compare pictures." });
+  };
+  return (
+    <Block title="Looks similar">
+      {!state.items && (
+        <button type="button" onClick={load} disabled={state.busy} className="rounded-full border border-line px-4 py-2 text-sm hover:border-muted disabled:opacity-60">
+          {state.busy ? "Comparing pictures…" : "Find items that look like this"}
+        </button>
+      )}
+      {state.error && <p role="alert" className="text-sm text-danger">{state.error}</p>}
+      {state.items && !state.items.length && <p className="text-sm text-muted">Nothing else in your library has a picture to compare with yet.</p>}
+      {state.items && state.items.length > 0 && (
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {state.items.map((i) => (
+            <li key={i.id}>
+              <Link href={`/library/${i.id}`} className="block overflow-hidden rounded-xl border border-line bg-surface hover:border-muted">
+                <div className="flex h-24 items-center justify-center bg-bg p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {i.thumbnail && <img src={thumb(i.thumbnail)} alt="" className="max-h-full max-w-full object-contain" />}
+                </div>
+                <div className="p-2 text-xs">
+                  <div className="truncate font-medium">{i.name}</div>
+                  <div className="text-muted">{Math.round(i.score * 100)}% alike{i.site ? ` · ${i.site}` : ""}</div>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-xs text-muted">Compares the shape and colours of the screenshots, so it finds look-alikes, not meaning.</p>
     </Block>
   );
 }

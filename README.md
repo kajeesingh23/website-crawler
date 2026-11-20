@@ -7,7 +7,7 @@ they work, and saving them to a personal visual library that Claude can reuse.
 
 ## Status
 
-Phases 1–7 are built: explore a website, select anything, see its design and motion, recreate it as code, make it yours, keep everything on your board, collect whole design systems, and let Claude Code reuse it all. See [docs/ROADMAP.md](docs/ROADMAP.md).
+All 8 phases are built: explore a website, select anything, see its design and motion, recreate it as code, make it yours, keep everything on your board, collect whole design systems, and let Claude Code reuse it all. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Using it
 
@@ -44,6 +44,22 @@ Phases 1–7 are built: explore a website, select anything, see its design and m
     buttons, cards, navigation and forms. Untick what you don't want, then **Download design.md** or
     **Save to library**. Each saved system is an independent reference; nothing is merged.
 
+### Refinements
+
+- **Looks similar:** on any item page, *Find items that look like this* compares the shape and
+  colours of screenshots. Claude can do the same with `find_similar`, including from a picture
+  you share ("find an animation similar to this screenshot").
+- **Pixel check:** every recreation also shows "Looks N% the same, pixel by pixel".
+- **Screen sizes:** in Explore, *Check screen sizes* shows the selection at phone, tablet and
+  desktop widths and highlights what changes.
+
+### Privacy and security
+
+- The app only answers on this computer (`npm run dev` listens on 127.0.0.1 only). Other devices
+  on your network, and other websites you visit, can't reach it or make it do anything.
+- Your library stays in `data/`, which is never committed. The database is backed up
+  automatically before any change to its structure.
+
 ## Using your library from Claude Code
 
 The project includes a local MCP server (`mcp/server.ts`) that lets Claude Code search and reuse
@@ -70,6 +86,7 @@ What Claude can do with it:
 | `get_assets` | Images, icons, fonts, screenshots (with a licence reminder) | No |
 | `get_preview` | The item's screenshot, so Claude can look at it | No |
 | `compare_items` | 2–4 items side by side | No |
+| `find_similar` | Look-alikes of an item or of a picture on this computer | No |
 | `list_collections` | Your collections | No |
 | `save_variation` | Saves new code as a **new** item; the original is never changed | Adds, after you agree |
 | `update_item` | Name, notes, tags, favourite | Edits, after you agree |
@@ -96,7 +113,7 @@ Requests use your Anthropic account and are billed to it. Everything else works 
 
 ## Install
 
-Requires Node.js 22.5+ (for the built-in `node:sqlite`).
+Requires Node.js 22.18 or newer (for the built-in `node:sqlite` and running TypeScript directly).
 
 ```bash
 npm install
@@ -119,13 +136,20 @@ npm run dev                  # http://localhost:3000
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) to learn how the app inspects websites.
 
-## Tests
+## Tests and releases
 
 ```bash
 npm test   # opens test pages in an invisible browser; your library is never touched
 ```
 
+GitHub runs lint, build and all tests on every push (`.github/workflows/ci.yml`). To publish a
+release, push a version tag; the same checks run and the release notes are written for you:
+
+```bash
+git tag v0.8.0 && git push origin v0.8.0
+```
+
 ## Troubleshooting
 
-- **`node:sqlite` not found:** update Node to 22.5 or newer.
+- **`node:sqlite` not found:** update Node to 22.18 or newer.
 - **Browser window doesn't open (from Phase 1):** run `npx playwright install chromium`.

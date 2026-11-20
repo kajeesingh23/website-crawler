@@ -7,11 +7,19 @@ export const dataDir = path.resolve(/*turbopackIgnore: true*/ process.env.PDI_DA
 
 const g = globalThis as typeof globalThis & { __pdiDb?: DatabaseSync };
 
+// The open database survives dev-server reloads, so new migrations are checked once per code load too.
+let checked = false;
+
 /** Opens data/database/library.db once per server process and applies any new migrations. */
 export function db(): DatabaseSync {
-  if (g.__pdiDb) return g.__pdiDb;
-  fs.mkdirSync(path.join(dataDir, "database"), { recursive: true });
   const file = path.join(dataDir, "database", "library.db");
+  if (g.__pdiDb) {
+    if (!checked) migrate(g.__pdiDb, file);
+    checked = true;
+    return g.__pdiDb;
+  }
+  checked = true;
+  fs.mkdirSync(path.join(dataDir, "database"), { recursive: true });
   const d = new DatabaseSync(file);
   d.exec(`PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;
     CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')));`);

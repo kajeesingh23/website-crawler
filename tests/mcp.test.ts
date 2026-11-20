@@ -53,7 +53,7 @@ const call = async (name: string, args: Record<string, unknown> = {}) => {
 test("Claude can find, open and reuse what's in the library", { timeout: 30_000 }, async () => {
   const tools = (await client.listTools()).tools;
   assert.deepEqual(tools.map((t) => t.name).sort(), [
-    "add_to_collection", "compare_items", "get_animation", "get_assets", "get_code", "get_design_tokens",
+    "add_to_collection", "compare_items", "find_similar", "get_animation", "get_assets", "get_code", "get_design_tokens",
     "get_item", "get_preview", "list_collections", "save_variation", "search_library", "update_item",
   ]);
   assert.ok(tools.filter((t) => t.name.startsWith("get_") || t.name.startsWith("search")).every((t) => t.annotations?.readOnlyHint), "reading tools are marked read-only");

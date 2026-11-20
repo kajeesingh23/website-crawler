@@ -6,6 +6,7 @@ import { normaliseUrl } from "../url.ts";
 import { extractDesign, type Design } from "./extract.ts";
 import { motionState, type Anim, type Declared } from "./motion.ts";
 import { snapshotElement } from "./snapshot.ts";
+import { pathOf } from "./responsive.ts";
 import { diffStates, newAnimations, type Change } from "./describe.ts";
 
 export type Selection = ElementInfo & {
@@ -321,6 +322,20 @@ export async function captureForRecreation() {
   try {
     if (!el) throw new Error("The selected element is gone. Select it again.");
     return { sel: { ...sel, design: sel.design }, url: s.snap.url, snapshot: await el.evaluate(snapshotElement) };
+  } finally {
+    await handle?.dispose().catch(() => undefined);
+  }
+}
+
+/** Where the selection lives: the page's address and a CSS address for the element. */
+export async function selectionAddress() {
+  const page = s.page;
+  if (!page || !s.snap.selection || !s.snap.url) throw new Error("Select something first.");
+  const handle = await page.evaluateHandle(() => (window as unknown as PdiWindow).__pdi.selected).catch(() => null);
+  const el = handle?.asElement();
+  try {
+    if (!el) throw new Error("The selected element is gone. Select it again.");
+    return { url: s.snap.url, path: await el.evaluate(pathOf) };
   } finally {
     await handle?.dispose().catch(() => undefined);
   }

@@ -5,6 +5,7 @@ import type { Command, Snapshot } from "@/lib/inspector/session";
 import { Inspector } from "./Inspector";
 import { MotionPanel } from "./Motion";
 import { RecreatePanel } from "./Recreate";
+import { ResponsivePanel } from "./Responsive";
 
 const NEXT_UP = ["Save assets", "Browse and organise everything on My Board"];
 
@@ -190,6 +191,7 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
               </section>
 
               <RecreatePanel key={sel.id} sel={sel} />
+              <ResponsivePanel key={`r-${sel.id}`} />
 
               {sel.design ? (
                 <Inspector design={sel.design} sample={sel.text.slice(0, 80)} />

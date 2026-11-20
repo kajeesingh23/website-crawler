@@ -10,8 +10,10 @@ process.env.PDI_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "pdi-sys-"));
 const { collectSystem, getCollected } = await import("../src/lib/system/collect.ts");
 const { designMd, filterSystem, guessRoles } = await import("../src/lib/system/design-md.ts");
 const L = await import("../src/lib/library.ts");
+const { checkSizes, pathOf } = await import("../src/lib/inspector/responsive.ts");
+const { browser } = await import("../src/lib/recreate/render.ts");
 
-const SITE = `<!doctype html><title>Calm Studio</title><style>
+const SITE = `<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><title>Calm Studio</title><style>
   body{margin:0;font:400 16px/1.5 Arial;color:#1a1a18;background:#f7f6f3}
   nav{display:flex;justify-content:space-between;padding:16px 32px}
   main{max-width:960px;margin:0 auto;padding:48px 24px}
@@ -79,6 +81,21 @@ test("a website's design language is collected, chosen from and saved", { timeou
   assert.equal(L.listItems({ q: "calm studio design system" })[0].id, id);
   L.deleteItems([id]);
   assert.equal(L.resolveDataFile(["design-systems", id, "design.md"]), null, "deleting removes its files");
+});
+
+test("the same element is measured at phone, tablet and desktop widths", { timeout: 60_000 }, async () => {
+  const page = await (await browser()).newPage();
+  await page.goto(url);
+  const path = await page.locator(".grid").evaluate(pathOf);
+  assert.equal(await page.locator(path).evaluate((e) => e.className), "grid", "the address finds the element again");
+  await page.close();
+
+  const [phone, tablet, desktop] = await checkSizes(url, path);
+  assert.deepEqual([phone.name, tablet.name, desktop.name], ["Phone", "Tablet", "Desktop"]);
+  assert.match(phone.layout!, /Grid of 1 column/, "the 768px rule stacks the cards on a phone");
+  assert.match(desktop.layout!, /Grid of 3 columns/);
+  assert.ok(phone.screenshot?.startsWith("data:image/png"));
+  assert.equal((await checkSizes(url, "#does-not-exist"))[0].found, false);
 });
 
 test("bad links are refused before anything loads", async () => {

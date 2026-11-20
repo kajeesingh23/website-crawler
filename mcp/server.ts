@@ -12,6 +12,7 @@ import { z } from "zod";
 process.chdir(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
 const L = await import("../src/lib/library.ts");
 const { dataDir, saveComponent } = await import("../src/lib/db.ts");
+const { findSimilar } = await import("../src/lib/visual/index.ts");
 const { describeLayout, describeMovement, movementBetween, duration, easingName, weightName } = await import("../src/lib/inspector/describe.ts");
 type Design = import("../src/lib/inspector/extract.ts").Design;
 type Motion = import("../src/lib/inspector/session.ts").Motion;
@@ -282,6 +283,39 @@ server.registerTool(
     annotations: READ,
   },
   async () => reply(L.listCollections()),
+);
+
+server.registerTool(
+  "find_similar",
+  {
+    title: "Find items that look similar",
+    description:
+      "Saved items whose screenshots look most like an item, or like a picture on this computer (for example a screenshot the user shared). Compares shape and colour, not meaning; scores are 0–1.",
+    inputSchema: {
+      id: z.string().optional().describe("Find look-alikes of this saved item"),
+      image_path: z.string().optional().describe("Or: full path of a PNG, JPEG or WebP picture on this computer"),
+      limit: z.number().int().min(1).max(20).optional(),
+    },
+    annotations: READ,
+  },
+  async ({ id, image_path, limit }) => {
+    if (!id && !image_path) return fail("Give an item id or an image_path.");
+    let target: { id: string } | { image: Buffer; mime: string };
+    if (id) {
+      if (!item(id)) return missing(id);
+      target = { id };
+    } else {
+      const ext = path.extname(image_path!).toLowerCase();
+      const mime = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp" }[ext];
+      if (!mime) return fail("Only PNG, JPEG or WebP pictures can be compared.");
+      if (!fs.existsSync(image_path!) || fs.statSync(image_path!).size > 20_000_000) return fail("That picture doesn't exist or is larger than 20 MB.");
+      target = { image: fs.readFileSync(image_path!), mime };
+    }
+    const found = await findSimilar(target, limit ?? 6);
+    return found.length
+      ? reply(found.map((i) => ({ id: i.id, name: i.name, kind: KINDS[i.kind] ?? i.kind, score: i.score, website: i.site, description: i.description })))
+      : reply("Nothing in the library has a picture to compare with yet.");
+  },
 );
 
 // ---------- Changes: never without the user's go-ahead ----------

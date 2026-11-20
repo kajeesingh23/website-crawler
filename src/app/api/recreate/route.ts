@@ -2,6 +2,7 @@ import { captureForRecreation } from "@/lib/inspector/session";
 import { buildDocument, compareDesigns, type Recreation } from "@/lib/recreate/document";
 import { renderAndMeasure } from "@/lib/recreate/render";
 import { askClaude, NotConnected } from "@/lib/recreate/claude";
+import { visualMatch } from "@/lib/visual";
 
 type Body = { action?: string; current?: Partial<Recreation>; instruction?: unknown };
 
@@ -62,9 +63,12 @@ export async function POST(req: Request) {
     }
 
     const rendered = await renderAndMeasure(version.html, width);
+    const original = dataUrlToPng(sel.screenshot);
+    const visual = original ? await visualMatch(original, rendered.png).catch(() => undefined) : undefined;
     return Response.json({
       version: {
         ...version,
+        visual, // 0–100, pixel by pixel against the original screenshot
         source: action,
         compare: compareDesigns(sel.design, rendered.design),
         screenshot: `data:image/png;base64,${rendered.png.toString("base64")}`,
