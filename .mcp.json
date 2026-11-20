@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "design-library": {
+      "command": "node",
+      "args": ["--no-warnings", "mcp/server.ts"]
+    }
+  }
+}
