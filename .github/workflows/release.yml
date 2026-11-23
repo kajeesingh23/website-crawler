@@ -1,4 +1,5 @@
-# Push a version tag (git tag v0.8.0 && git push origin v0.8.0) to check everything and publish a release.
+# Runs when a version tag appears: pushed (git tag v1.0.0 && git push origin v1.0.0) or created by
+# publishing a release on GitHub. Checks everything, then publishes the release if it doesn't exist yet.
 name: Release
 
 on:
@@ -26,4 +27,5 @@ jobs:
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+        # A release published on the website already exists; don't try to create it twice.
+        run: gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag

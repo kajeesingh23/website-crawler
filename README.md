@@ -146,7 +146,7 @@ GitHub runs lint, build and all tests on every push (`.github/workflows/ci.yml`)
 release, push a version tag; the same checks run and the release notes are written for you:
 
 ```bash
-git tag v0.8.0 && git push origin v0.8.0
+git tag v1.0.0 && git push origin v1.0.0
 ```
 
 ## Troubleshooting
