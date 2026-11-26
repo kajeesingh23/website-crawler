@@ -1,5 +1,6 @@
-// Runs INSIDE the inspected website (Playwright injects it before the site's own scripts).
-// Playwright sends it as source text, so it must be self-contained: no imports, no outer variables.
+// Runs INSIDE the inspected website: Playwright injects it before the site's own scripts, and the
+// Plax extension runs it as its content script. Playwright sends it as source text, so it must be
+// self-contained: no imports, no outer variables.
 
 export type ElementInfo = {
   label: string; // plain-language name, e.g. "Button"
@@ -19,7 +20,7 @@ export type PageEvent =
   | { type: "select"; info: ElementInfo }
   | { type: "clear" };
 
-export function overlay() {
+export function overlay(opts?: { smart?: boolean }) {
   type W = Window & { __pdi?: unknown; __pdiEmit?: (ev: unknown) => Promise<unknown> };
   const w = window as W;
   if (w !== w.top || w.__pdi) return; // top page only; embedded frames are reported, not entered
@@ -34,11 +35,13 @@ export function overlay() {
   const root = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style");
   style.textContent = `
-    .box{position:fixed;pointer-events:none;z-index:2147483646;border:2px solid #3b6cff;background:rgba(59,108,255,.08);border-radius:3px;display:none}
+    .box{position:fixed;pointer-events:none;z-index:2147483646;border:2px solid #4f3bf5;background:rgba(79,59,245,.08);border-radius:3px;display:none}
     .sel{border-color:#ff5c28;background:rgba(255,92,40,.06)}
     .tip{position:fixed;pointer-events:none;z-index:2147483647;font:500 12px/1.3 system-ui,sans-serif;color:#fff;background:#141414;padding:5px 9px;border-radius:7px;display:none;white-space:nowrap;max-width:380px;overflow:hidden;text-overflow:ellipsis}
     .pill{all:initial;position:fixed;right:18px;bottom:18px;z-index:2147483647;font:500 13px/1 system-ui,sans-serif;color:#fff;background:#141414;padding:11px 16px;border-radius:999px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25)}
-    .pill.on{background:#3b6cff}`;
+    .pill.on{background:#4f3bf5}
+    .mark{position:fixed;pointer-events:none;z-index:2147483645;border:2px solid #4f3bf5;border-radius:3px;display:none}
+    .mark b{position:absolute;left:-2px;top:-20px;font:600 11px/18px system-ui,sans-serif;color:#fff;background:#4f3bf5;padding:0 6px;border-radius:4px 4px 4px 0}`;
   const make = (cls: string, tag = "div") => {
     const el = document.createElement(tag);
     el.className = cls;
@@ -71,6 +74,7 @@ export function overlay() {
     if (tag === "header" || role === "banner") return "Header";
     if (tag === "footer" || role === "contentinfo") return "Footer";
     if (tag === "button" || role === "button") return "Button";
+    if (opts?.smart && isCard(el)) return "Card";
     if (tag === "a") return hasText() ? "Link" : "Image link";
     if (/^h[1-6]$/.test(tag)) return "Heading";
     if (tag === "p") return "Paragraph";
@@ -148,6 +152,52 @@ export function overlay() {
     return el.closest("svg") ?? el; // treat an icon as one thing, not its inner paths
   }
 
+  // Smart picking (the extension): a click on a card's title, icon or button picks the whole card.
+  // A "card" is a self-contained box smaller than the screen that either looks separate (its own
+  // background, border or shadow) or groups a picture with text (article, list item, figure, link).
+  const CONTROL = "a,button,[role=button],label,summary,input,select,textarea";
+  function looksSeparate(n: Element) {
+    const s = getComputedStyle(n);
+    const bg = (s.backgroundColor !== "rgba(0, 0, 0, 0)" && s.backgroundColor !== "transparent") || s.backgroundImage !== "none";
+    const border = (["Top", "Right", "Bottom", "Left"] as const).some((d) => parseFloat(s[`border${d}Width`]) > 0 && s[`border${d}Style`] !== "none");
+    return bg || border || s.boxShadow !== "none";
+  }
+  function isCard(n: Element) {
+    const r = n.getBoundingClientRect();
+    if (r.width < 40 || r.height < 40 || n.childElementCount === 0 || n.querySelectorAll("*").length < 2) return false;
+    const tag = n.tagName.toLowerCase();
+    const media = !!n.querySelector("img,picture,svg,video");
+    const text = !!n.textContent?.trim();
+    if (tag === "a") return media && text; // a link that wraps a picture and text is a card; a text link isn't
+    if (n.matches(CONTROL)) return false;
+    return looksSeparate(n) || (["article", "li", "figure"].includes(tag) && media && text);
+  }
+  function componentOf(el: Element): Element {
+    const control = el.closest(CONTROL);
+    const fallback = control && control !== document.body ? control : el; // text or icon inside a button → the button
+    for (let n: Element | null = el, depth = 0; n && n !== document.body && depth < 8; n = n.parentElement, depth++) {
+      const r = n.getBoundingClientRect();
+      if (r.width >= innerWidth * 0.9 || r.height >= innerHeight * 0.9) break; // reached a whole section: stop climbing
+      if (isCard(n)) return n;
+    }
+    return fallback;
+  }
+  // Alt (Option) + click always picks exactly what's under the pointer.
+  const target = (el: Element | null, exact = false) => (el && opts?.smart && !exact && el.tagName.toLowerCase() !== "iframe" ? componentOf(el) : el);
+
+  // Numbered outlines for everything kept in a multi-selection (the extension's list).
+  let marked: Element[] = [];
+  const markBoxes: HTMLElement[] = [];
+  function drawMarks() {
+    marked.forEach((el, i) => {
+      const box = (markBoxes[i] ??= make("mark"));
+      if (!box.firstChild) box.appendChild(document.createElement("b"));
+      box.firstChild!.textContent = String(i + 1);
+      draw(box, el.isConnected ? el : null);
+    });
+    for (const box of markBoxes.slice(marked.length)) box.style.display = "none";
+  }
+
   function select(el: Element | null) {
     if (!el) return;
     selected = el;
@@ -214,6 +264,10 @@ export function overlay() {
     showOverlay(on: boolean) {
       host.style.display = on ? "" : "none";
     },
+    mark(els: Element[]) {
+      marked = els;
+      drawMarks();
+    },
     get selected() {
       return selected;
     },
@@ -229,7 +283,7 @@ export function overlay() {
     "mousemove",
     (e) => {
       if (!inspecting) return;
-      hovered = pick(e.clientX, e.clientY);
+      hovered = target(pick(e.clientX, e.clientY), e.altKey);
       draw(hoverBox, hovered);
       if (!hovered) return void (tip.style.display = "none");
       // Only the cheap parts here: this runs on every mouse move.
@@ -253,7 +307,7 @@ export function overlay() {
         e.preventDefault();
         e.stopImmediatePropagation();
         const m = e as MouseEvent;
-        if (type === "click") select(pick(m.clientX, m.clientY));
+        if (type === "click") select(target(pick(m.clientX, m.clientY), m.altKey));
       },
       true,
     );
@@ -270,6 +324,7 @@ export function overlay() {
   const redraw = () => {
     draw(hoverBox, hovered);
     draw(selBox, selected);
+    drawMarks();
   };
   addEventListener("scroll", redraw, true);
   addEventListener("resize", redraw);
