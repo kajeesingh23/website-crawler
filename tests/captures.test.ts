@@ -62,6 +62,7 @@ test("a capture is saved with its picture and copy, grouped by visit and website
   const [site] = L.listWebsites();
   assert.deepEqual([site.items, site.analyses], [2, 1]);
   assert.deepEqual(L.listItems({ kinds: ["asset"] }).map((i) => i.id), [icon]);
+  assert.equal(L.getItem(id)!.moves, false, "nothing moving means no Moves badge");
 });
 
 test("anything malformed is refused before it's stored", () => {

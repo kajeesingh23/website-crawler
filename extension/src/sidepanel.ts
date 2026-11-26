@@ -121,17 +121,18 @@ const sendMarks = () => toTab({ type: "plax:marks", ids: session.captures.map((c
 async function photograph(windowId: number, rect: Rect, viewport: { width: number; height: number }) {
   const shot = await chrome.tabs.captureVisibleTab(windowId, { format: "png" });
   const bitmap = await createImageBitmap(await (await fetch(shot)).blob());
-  const k = bitmap.width / viewport.width; // screen pixels per page pixel (retina, zoom)
+  const kx = bitmap.width / viewport.width; // screen pixels per page pixel (retina, zoom)
+  const ky = bitmap.height / viewport.height;
   const x0 = Math.max(0, rect.x);
   const y0 = Math.max(0, rect.y);
   const x1 = Math.min(viewport.width, rect.x + rect.width);
   const y1 = Math.min(viewport.height, rect.y + rect.height);
   if (x1 - x0 < 1 || y1 - y0 < 1) return {};
   const partial = x0 > rect.x + 1 || y0 > rect.y + 1 || x1 < rect.x + rect.width - 1 || y1 < rect.y + rect.height - 1;
-  const [sw, sh] = [(x1 - x0) * k, (y1 - y0) * k];
+  const [sw, sh] = [(x1 - x0) * kx, (y1 - y0) * ky];
   const fit = Math.min(1, 1600 / sw); // keeps stored pictures small
   const canvas = new OffscreenCanvas(Math.max(1, Math.round(sw * fit)), Math.max(1, Math.round(sh * fit)));
-  canvas.getContext("2d")!.drawImage(bitmap, x0 * k, y0 * k, sw, sh, 0, 0, canvas.width, canvas.height);
+  canvas.getContext("2d")!.drawImage(bitmap, x0 * kx, y0 * ky, sw, sh, 0, 0, canvas.width, canvas.height);
   const blob = await canvas.convertToBlob({ type: "image/png" });
   const screenshot = await new Promise<string>((done) => {
     const reader = new FileReader();

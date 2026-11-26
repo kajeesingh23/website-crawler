@@ -70,6 +70,10 @@ export function ftsQuery(text: string): string | null {
 }
 
 const CAT = "COALESCE(i.category, json_extract(i.observed, '$.element.label'))";
+// Something was seen moving: on its own, on hover or when scrolled into view (not just "motion was looked at").
+const MOVING = ["running", "hover.changes", "hover.animations", "scroll.changes", "scroll.animations"]
+  .map((k) => `COALESCE(json_array_length(i.observed, '$.motion.${k}'), 0)`)
+  .join(" + ");
 
 export function listItems(query: Query = {}): ItemCard[] {
   const where: string[] = [];
@@ -96,7 +100,7 @@ export function listItems(query: Query = {}): ItemCard[] {
 
   const cols = `i.id, i.kind, i.name, i.description, ${CAT} AS category, i.tags, i.favourite, i.thumbnail, i.source_url,
     i.created_at, i.variant_of, COALESCE(w.title, w.url) AS site,
-    (i.kind = 'animation' OR json_extract(i.observed, '$.motion') IS NOT NULL) AS moves`;
+    (i.kind = 'animation' OR ${MOVING} > 0) AS moves`;
   const sql = fts
     ? `SELECT ${cols} FROM items_fts JOIN items i ON i.rowid = items_fts.rowid LEFT JOIN websites w ON w.id = i.website_id
        WHERE items_fts MATCH ? ${where.map((w) => `AND ${w}`).join(" ")} ORDER BY items_fts.rank`
