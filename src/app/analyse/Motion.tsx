@@ -18,7 +18,8 @@ const PLAYABLE = new Set(["transform", "translate", "scale", "rotate", "opacity"
 const COLOUR_PROPS = new Set(["color", "background-color", "border-color", "outline-color"]);
 const camel = (p: string) => p.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 
-export function MotionPanel({ motion, image }: { motion: Motion; image?: string }) {
+/** `untested`: captured with the extension, which can't hover, focus or scroll the element. */
+export function MotionPanel({ motion, image, untested }: { motion: Motion; image?: string; untested?: boolean }) {
   const nothing =
     !motion.running.length &&
     !motion.scriptedIdle &&
@@ -34,10 +35,16 @@ export function MotionPanel({ motion, image }: { motion: Motion; image?: string 
     <div className="space-y-10">
       <p className="inline-block rounded-lg bg-accent-soft px-3 py-1 text-xs font-medium">Observed on the page, not guessed</p>
 
+      {untested && (
+        <p className="rounded-lg bg-warn-soft px-4 py-3 text-sm text-warn-ink">
+          Captured with the browser extension, so hover, focus and scroll-in weren&rsquo;t tested (extensions can&rsquo;t move your mouse). To test them, open
+          the page in Analyse Website.
+        </p>
+      )}
+
       {nothing && (
         <p className="text-muted">
-          No movement found. It doesn’t animate on its own, on hover{motion.focus ? ", on focus" : ""}
-          {motion.scroll ? " or when scrolled into view" : ""}.
+          {untested ? "Nothing moves on its own." : `No movement found. It doesn’t animate on its own, on hover${motion.focus ? ", on focus" : ""}${motion.scroll ? " or when scrolled into view" : ""}.`}
           {motion.transitions.length > 0 && " It is set up to change smoothly, though, so something else on the page may trigger it."}
         </p>
       )}
@@ -77,7 +84,7 @@ export function MotionPanel({ motion, image }: { motion: Motion; image?: string 
         </Moment>
       )}
 
-      <p className="text-xs text-muted">Clicks aren’t tested, so the website never navigates away while you explore.</p>
+      {!untested && <p className="text-xs text-muted">Clicks aren’t tested, so the website never navigates away while you explore.</p>}
     </div>
   );
 }

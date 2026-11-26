@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { Selection } from "@/lib/inspector/session";
+import type { Design } from "@/lib/inspector/extract";
 import { FONTS, SHADOWS, applyOverrides, type CompareRow, type Overrides, type Recreation } from "@/lib/recreate/document";
 
 type Version = Recreation & { source: "copy" | "claude" | "improve" | "edit"; compare: CompareRow[]; screenshot: string; visual?: number };
@@ -119,7 +120,7 @@ export function RecreatePanel({ sel }: { sel: Selection }) {
             )}
           </div>
 
-          <Studio sel={sel} overrides={overrides} onChange={setOverrides} />
+          <Studio design={sel.design} overrides={overrides} onChange={setOverrides} />
           {connected && <Instruction busy={busy === "edit"} onSend={(text) => run("edit", text)} />}
           <Code v={v} overrides={overrides} />
           <SaveComponent key={current} v={v} overrides={overrides} />
@@ -260,8 +261,9 @@ function Match({ v }: { v: Version }) {
   );
 }
 
-function Studio({ sel, overrides, onChange }: { sel: Selection; overrides: Overrides; onChange: (o: Overrides) => void }) {
-  const a = sel.design?.appearance;
+/** Colours, font, shadow, text size, spacing, corners and speed, as CSS variables on the copy. */
+export function Studio({ design, overrides, onChange, narrow }: { design?: Design; overrides: Overrides; onChange: (o: Overrides) => void; narrow?: boolean }) {
+  const a = design?.appearance;
   const set = (patch: Overrides) => onChange({ ...overrides, ...patch });
   const slider = (key: "typeScale" | "space" | "radiusScale" | "speed", label: string, min: number, max: number, hint: (n: number) => string) => (
     <label className="grid grid-cols-[8rem_1fr_4rem] items-center gap-3 text-sm">
@@ -274,14 +276,14 @@ function Studio({ sel, overrides, onChange }: { sel: Selection; overrides: Overr
   return (
     <div>
       <div className="mb-3 flex items-baseline justify-between">
-        <h4 className="font-medium">Customise</h4>
+        {!narrow && <h4 className="font-medium">Customise</h4>}
         {Object.keys(overrides).length > 0 && (
-          <button type="button" onClick={() => onChange({})} className="text-sm text-accent hover:underline">
+          <button type="button" onClick={() => onChange({})} className="ml-auto text-sm text-accent hover:underline">
             Back to original
           </button>
         )}
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className={`grid gap-4 ${narrow ? "" : "md:grid-cols-2"}`}>
         <div className="space-y-3">
           <label className="flex items-center justify-between gap-3 text-sm">
             <span className="text-muted">Background</span>
@@ -294,7 +296,7 @@ function Studio({ sel, overrides, onChange }: { sel: Selection; overrides: Overr
           <label className="flex items-center justify-between gap-3 text-sm">
             <span className="text-muted">Font</span>
             <select value={overrides.font ?? ""} onChange={(e) => set({ font: e.target.value || undefined })} className="rounded-lg border border-line bg-surface px-2 py-1">
-              <option value="">Original ({sel.design?.typography.family})</option>
+              <option value="">Original ({design?.typography.family})</option>
               {Object.keys(FONTS).map((f) => (
                 <option key={f}>{f}</option>
               ))}
@@ -317,7 +319,9 @@ function Studio({ sel, overrides, onChange }: { sel: Selection; overrides: Overr
           {slider("speed", "Animation length", 0.25, 3, (n) => `${Math.round(n * 100) / 100}×`)}
         </div>
       </div>
-      <p className="mt-2 text-xs text-muted">Changes show live on the recreated side and are included when you copy or save.</p>
+      <p className="mt-2 text-xs text-muted">
+        Changes show live {narrow ? "in the preview" : "on the recreated side"} and are included when you {narrow ? "save" : "copy or save"}.
+      </p>
     </div>
   );
 }

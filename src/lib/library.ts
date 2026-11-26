@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { dataDir, db, saveItem } from "./db.ts";
+import { dataDir, db, saveComponent, saveItem } from "./db.ts";
 import type { SystemData } from "./system/extract-system.ts";
 import { designMd } from "./system/design-md.ts";
 import { describeLayout, describeMovement, movementBetween } from "./inspector/describe.ts";
@@ -176,6 +176,8 @@ export type ItemDetail = ItemCard & {
   versions: { version: number; framework: string | null; note: string | null; createdAt: string; files: string[]; codePath: string | null }[];
   collections: string[];
   code: { html?: string; react?: string };
+  original: { id: string; name: string } | null; // what this is a variation of
+  variations: { id: string; name: string; thumbnail: string | null }[];
 };
 
 export function getItem(id: string): ItemDetail | null {
@@ -203,7 +205,43 @@ export function getItem(id: string): ItemDetail | null {
     versions,
     collections: (db().prepare("SELECT collection_id AS id FROM collection_items WHERE item_id = ?").all(id) as { id: string }[]).map((r) => r.id),
     code: { html: read("component.html"), react: read("Component.tsx") },
+    original: originalOf(base.variantOf),
+    variations: db()
+      .prepare("SELECT id, name, thumbnail FROM items WHERE variant_of = ? ORDER BY created_at DESC")
+      .all(id)
+      .map((r) => ({ ...r })) as ItemDetail["variations"],
   };
+}
+
+function originalOf(id: string | null) {
+  const row = id ? db().prepare("SELECT id, name FROM items WHERE id = ?").get(id) : undefined;
+  return row ? { id: String(row.id), name: String(row.name) } : null; // a plain object, so it can go to the browser
+}
+
+/**
+ * A customised copy saved as its own item, linked to the original by variant_of.
+ * The original, its files and its versions are never changed.
+ */
+export function saveVariation(sourceId: string, v: { name: string; html: string; png?: Buffer; changes: unknown }): string {
+  const src = getItem(sourceId);
+  if (!src) throw new Error("The original no longer exists.");
+  const name = v.name.trim();
+  if (!name || name.length > 120) throw new Error("A name needs 1 to 120 characters.");
+  if (!v.html.includes("pdi-root") || v.html.length > 6_000_000) throw new Error("The customised copy isn't valid.");
+  return saveComponent({
+    kind: src.kind === "asset" ? "asset" : "component",
+    name,
+    sourceUrl: src.sourceUrl ?? undefined,
+    png: v.png,
+    html: v.html,
+    note: "Customised in Plax",
+    variantOf: src.id,
+    observed: src.observed, // what was measured on the original page; the changes are kept apart below
+    inferred: { source: "variation", of: src.id, changes: v.changes },
+    category: src.category ?? undefined,
+    tags: [...new Set([...src.tags, "variation"])],
+    description: `Variation of “${src.name}”`,
+  });
 }
 
 // Folders the app may serve files from; everything else in data/ (the database above all) stays private.

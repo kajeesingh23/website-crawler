@@ -12,6 +12,7 @@ import { MotionPanel } from "@/app/analyse/Motion";
 import { day, thumb } from "@/app/library/Board";
 import { SystemView } from "@/components/SystemView";
 import { BuildPanel } from "@/components/BuildPanel";
+import { Customise } from "./Customise";
 import type { SystemData } from "@/lib/system/extract-system";
 
 const webUrl = (u: string | null) => (u && /^https?:\/\//i.test(u) ? u : undefined);
@@ -139,11 +140,11 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
 
       {motion && (
         <Block title="Animation">
-          <MotionPanel motion={motion} image={thumb(item.thumbnail)} />
+          <MotionPanel motion={motion} image={thumb(item.thumbnail)} untested={item.observed.capturedWith === "extension"} />
         </Block>
       )}
 
-      {item.kind === "component" && (inferred.source || inferred.unknowns?.length) && (
+      {item.kind === "component" && ["copy", "claude", "improve", "edit"].includes(inferred.source ?? "") && (
         <Block title="How it was recreated">
           <p className="text-sm">
             {inferred.source === "copy" ? "An exact copy made from the measurements, without AI." : "Recreated with Claude."}
@@ -155,6 +156,41 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
             <ul className="mt-3 list-disc space-y-0.5 pl-5 text-sm text-muted">
               {inferred.unknowns.map((u, i) => (
                 <li key={i}>{u}</li>
+              ))}
+            </ul>
+          )}
+        </Block>
+      )}
+
+      {item.code.html && (
+        <Block title="Customise">
+          <Customise id={item.id} name={item.name} html={item.code.html} design={design} width={element?.width ?? design?.layout.width ?? 600} />
+        </Block>
+      )}
+
+      {(item.original || item.variations.length > 0) && (
+        <Block title="Variations">
+          {item.original && (
+            <p className="mb-3 text-sm">
+              This is a variation of{" "}
+              <Link href={`/library/${item.original.id}`} className="font-medium text-accent hover:underline">
+                {item.original.name}
+              </Link>
+              .
+            </p>
+          )}
+          {item.variations.length > 0 && (
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {item.variations.map((v) => (
+                <li key={v.id}>
+                  <Link href={`/library/${v.id}`} className="block overflow-hidden rounded-xl border border-line bg-surface hover:border-muted">
+                    <div className="flex h-24 items-center justify-center bg-bg p-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {v.thumbnail ? <img src={thumb(v.thumbnail)} alt="" className="max-h-full max-w-full object-contain" /> : null}
+                    </div>
+                    <div className="truncate px-2 py-1.5 text-xs">{v.name}</div>
+                  </Link>
+                </li>
               ))}
             </ul>
           )}
