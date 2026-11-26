@@ -41,7 +41,7 @@ async function Library({ searchParams }: Pick<PageProps<"/library">, "searchPara
   };
   const counts = libraryCounts();
   const collections = listCollections();
-  const board = { collections, options: filterOptions() };
+  const board = { collections };
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -68,8 +68,10 @@ async function Library({ searchParams }: Pick<PageProps<"/library">, "searchPara
         {tab === "components" && (
           <Board
             {...board}
+            options={filterOptions()}
             tab="components"
-            items={listItems({ ...query, kinds: ["component", "animation", "typography", "layout", "section"] })}
+            // A collection or a website shows everything in it; otherwise this tab is components and animations.
+            items={listItems({ ...query, kinds: query.collection || query.website ? undefined : ["component", "animation", "typography", "layout", "section"] })}
             total={counts.total - counts.designSystems - counts.assets}
             filters={(Object.entries(FILTERS) as [Filter, string][]).filter(([k]) => k !== "asset")}
             active={query}

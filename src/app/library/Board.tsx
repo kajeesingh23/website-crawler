@@ -166,7 +166,7 @@ export function Board({ tab, items, total, collections, filters, options, active
             </div>
           ) : (
             <ul className={`grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-4 ${pending ? "opacity-70" : ""}`} onDragEnd={() => setDragId(null)}>
-              {items.map((item) => (
+              {items.map((item, i) => (
                 <li
                   key={item.id}
                   draggable={canDrag}
@@ -199,11 +199,26 @@ export function Board({ tab, items, total, collections, filters, options, active
                   >
                     {item.favourite ? "★" : "☆"}
                   </button>
+                  {canDrag && items.length > 1 && (
+                    // The keyboard way to rearrange (dragging needs a mouse).
+                    <div className="absolute right-3 bottom-3 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                      {i > 0 && (
+                        <button type="button" aria-label={`Move ${item.name} earlier`} onClick={() => act(() => A.moveItem(item.id, items[i - 1].id, "before"))} className="grid size-7 place-items-center rounded-md border border-line bg-surface text-xs">
+                          ←
+                        </button>
+                      )}
+                      {i < items.length - 1 && (
+                        <button type="button" aria-label={`Move ${item.name} later`} onClick={() => act(() => A.moveItem(item.id, items[i + 1].id, "after"))} className="grid size-7 place-items-center rounded-md border border-line bg-surface text-xs">
+                          →
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
           )}
-          {canDrag && items.length > 1 && <p className="mt-3 text-xs text-muted">Drag cards to rearrange them.</p>}
+          {canDrag && items.length > 1 && <p className="mt-3 text-xs text-muted">Drag cards to rearrange them, or use the arrows on each card.</p>}
         </div>
       </div>
     </div>
