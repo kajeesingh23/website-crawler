@@ -136,6 +136,8 @@ npm run dev                  # http://localhost:3000
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) to learn how the app inspects websites.
 
+**Next:** this project is becoming **Plax**. See [docs/PLAX-AUDIT.md](docs/PLAX-AUDIT.md) for the audit and plan.
+
 ## Tests and releases
 
 ```bash
