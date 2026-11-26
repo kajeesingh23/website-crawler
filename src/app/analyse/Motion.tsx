@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Interaction, Motion } from "@/lib/inspector/session";
 import type { Anim, Declared, Keyframe } from "@/lib/inspector/motion";
 import {
@@ -18,7 +18,7 @@ const PLAYABLE = new Set(["transform", "translate", "scale", "rotate", "opacity"
 const COLOUR_PROPS = new Set(["color", "background-color", "border-color", "outline-color"]);
 const camel = (p: string) => p.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 
-export function MotionPanel({ motion, image, canSave = true }: { motion: Motion; image?: string; canSave?: boolean }) {
+export function MotionPanel({ motion, image }: { motion: Motion; image?: string }) {
   const nothing =
     !motion.running.length &&
     !motion.scriptedIdle &&
@@ -78,7 +78,6 @@ export function MotionPanel({ motion, image, canSave = true }: { motion: Motion;
       )}
 
       <p className="text-xs text-muted">Clicks aren’t tested, so the website never navigates away while you explore.</p>
-      {canSave && <SaveAnimation />}
     </div>
   );
 }
@@ -363,44 +362,5 @@ function Curve({ easing }: { easing: string }) {
       <rect x="2" y="2" width="20" height="20" fill="none" stroke="var(--line)" />
       <path d={`M${p(0, 0)} C${p(x1, y1)} ${p(x2, y2)} ${p(1, 1)}`} fill="none" stroke="var(--accent)" strokeWidth="1.5" />
     </svg>
-  );
-}
-
-function SaveAnimation() {
-  const [name, setName] = useState("");
-  const [state, setState] = useState<{ ok?: boolean; error?: string }>({});
-  async function save(e: FormEvent) {
-    e.preventDefault();
-    const res = await fetch("/api/library/animations", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name }),
-    }).catch(() => null);
-    if (res?.ok) setState({ ok: true });
-    else setState({ error: (await res?.json().catch(() => null))?.error ?? "Couldn't save. Is the app still running?" });
-  }
-  if (state.ok) return <p className="rounded-xl bg-accent-soft px-4 py-3 text-sm">Saved to your library.</p>;
-  return (
-    <form onSubmit={save} className="flex flex-col gap-2 border-t border-line pt-5 sm:flex-row">
-      <label htmlFor="anim-name" className="sr-only">
-        Animation name
-      </label>
-      <input
-        id="anim-name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Name this animation, e.g. Soft hover lift"
-        maxLength={120}
-        className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-4 py-2 text-sm outline-none focus:border-accent"
-      />
-      <button type="submit" className="rounded-lg bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90">
-        Save animation
-      </button>
-      {state.error && (
-        <p role="alert" className="text-sm text-danger sm:basis-full">
-          {state.error}
-        </p>
-      )}
-    </form>
   );
 }

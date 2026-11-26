@@ -11,10 +11,13 @@ type Op =
   | { t: "replace"; before: Capture; at: number }
   | { t: "clear"; captures: Capture[] }
   | { t: "move"; from: number; to: number };
-type Session = { captures: Capture[]; undo: Op[] };
+type Session = { captures: Capture[]; undo: Op[]; analyses?: Record<string, string> }; // analyses: page address → visit id
+type Settings = { app: string; token?: string; paired?: boolean };
 type View = { name: "main" } | { name: "detail"; id: string; tab: "design" | "copy" } | { name: "settings" };
 
 let session: Session = { captures: [], undo: [] };
+let settings: Settings = { app: "http://localhost:3000" };
+let saving: string | null = null; // id of the capture being saved
 let view: View = { name: "main" };
 let selecting = false;
 let target: chrome.Tab | undefined; // the website tab this panel works on
@@ -168,6 +171,73 @@ chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
   else render();
 });
 
+// ---------- The Plax app ----------
+
+const APP_ADDRESS = /^http:\/\/localhost(:\d{1,5})?$/; // the extension may only talk to this computer
+
+/** Calls the paired app. Throws with a message a person can act on. */
+async function callApp(path: "pair" | "save", body: unknown) {
+  let res: Response;
+  try {
+    res = await fetch(`${settings.app}/api/captures/${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-plax-token": settings.token ?? "" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error(`The Plax app isn't answering at ${settings.app}. Start it (npm run dev in its folder), then try again.`);
+  }
+  const json = (await res.json().catch(() => ({}))) as { error?: string; id?: string };
+  if (res.status === 403) {
+    settings.paired = false;
+    void chrome.storage.local.set({ settings });
+  }
+  if (!res.ok) throw new Error(json.error ?? `The Plax app answered with an error (${res.status}).`);
+  return json;
+}
+
+async function connect(app: string, code: string) {
+  app = app.trim().replace(/\/+$/, "");
+  if (!APP_ADDRESS.test(app)) {
+    notice = { text: "The app's address must be on this computer, like http://localhost:3000.", error: true };
+    return render();
+  }
+  settings = { app, token: code.trim(), paired: false };
+  try {
+    await callApp("pair", {});
+    settings.paired = true;
+    notice = { text: "Connected. Saved selections now go to your Plax Library." };
+  } catch (e) {
+    notice = { text: (e as Error).message, error: true };
+  }
+  await chrome.storage.local.set({ settings });
+  render();
+}
+
+async function save(c: Capture) {
+  if (!settings.paired) {
+    notice = { text: "Connect the extension to the Plax app first: open Settings here and paste the code from the app's Settings.", error: true };
+    return render();
+  }
+  saving = c.id;
+  notice = undefined;
+  render();
+  try {
+    const analyses = (session.analyses ??= {});
+    const { id } = await callApp("save", { analysisId: (analyses[c.url] ??= crypto.randomUUID()), capture: c });
+    c.saved = { id: id!, at: new Date().toISOString() };
+    notice = { text: `Saved “${c.name}” to your Library.` };
+    await persist();
+  } catch (e) {
+    notice = { text: (e as Error).message, error: true };
+  } finally {
+    saving = null;
+    render();
+  }
+}
+
+const openInApp = (path: string) => void chrome.tabs.create({ url: `${settings.app}${path}` });
+
 // ---------- Building the page ----------
 
 type Child = Node | string | false | null | undefined;
@@ -194,16 +264,19 @@ const hostOf = (u?: string) => {
 
 function render() {
   const focusId = (document.activeElement as HTMLElement | null)?.dataset?.focus;
-  app.replaceChildren(header(), view.name === "detail" ? detail(view) : view.name === "settings" ? settings() : main());
+  app.replaceChildren(header(), view.name === "detail" ? detail(view) : view.name === "settings" ? settingsView() : main());
   if (focusId) (app.querySelector(`[data-focus="${CSS.escape(focusId)}"]`) as HTMLElement | null)?.focus(); // keyboard users keep their place
 }
 
 function header() {
   const logo = h("span", { className: "logo" }, h("img", { src: "icons/icon-32.png", alt: "" }), "plax");
+  const title = view.name === "settings" && h("strong", { style: { marginRight: "auto" } }, "Settings");
   return h(
     "header",
     {},
     view.name === "main" ? logo : btn("← Back", () => ((view = { name: "main" }), render()), "btn ghost", { "data-focus": "back" }),
+    title,
+    h("span", { className: "status" }, h("span", { className: `dot${settings.paired ? " on" : ""}`, "aria-hidden": "true" }), settings.paired ? "Connected" : "Not connected"),
     view.name === "main" && btn("Settings", () => ((view = { name: "settings" }), render()), "btn ghost", { "data-focus": "settings" }),
   );
 }
@@ -351,6 +424,9 @@ function detail(v: Extract<View, { name: "detail" }>) {
       }),
       h("p", { className: "muted small truncate" }, [c.label, `${c.width} × ${c.height}`, hostOf(c.url)].join(" · ")),
       c.note && h("p", { className: "notice error small" }, c.note),
+      c.saved
+        ? h("div", { className: "row" }, h("span", { className: "grow" }, "✓ Saved to your Library"), btn("Open in Library", () => openInApp(`/library/${c.saved!.id}`), "btn", { "data-focus": "open-app" }))
+        : btn(saving === c.id ? "Saving…" : "Save to Library", () => void save(c), "btn big accent", { disabled: saving === c.id, "data-focus": "save" }),
     ),
     h(
       "div",
@@ -413,11 +489,49 @@ function liveCopy(c: Capture) {
   );
 }
 
-function settings() {
+function settingsView() {
+  const app = h("input", { id: "app-address", className: "text", value: settings.app, autocomplete: "off", spellcheck: false });
+  const code = h("input", { id: "pair-code", className: "text", placeholder: "plax-…", autocomplete: "off", spellcheck: false });
   return h(
     "main",
     {},
     noticeBox(),
+    h(
+      "form",
+      {
+        className: "card",
+        "aria-label": "Connect to the Plax app",
+        onSubmit: (e: Event) => {
+          e.preventDefault();
+          void connect(app.value, code.value);
+        },
+      },
+      h("h2", {}, "Plax app"),
+      h(
+        "p",
+        { className: "muted small" },
+        settings.paired
+          ? `Connected to ${settings.app}. Saved selections go to its Library.`
+          : "To save selections to your Library, start the Plax app, open its Settings, choose Connect the extension, and paste the code here.",
+      ),
+      h("label", { className: "small muted", htmlFor: "app-address" }, "App address"),
+      app,
+      h("label", { className: "small muted", htmlFor: "pair-code" }, settings.paired ? "New code (only to reconnect)" : "Code from the app"),
+      code,
+      h(
+        "div",
+        { className: "row" },
+        h("button", { type: "submit", className: "btn primary" }, settings.paired ? "Reconnect" : "Connect"),
+        settings.paired &&
+          btn("Disconnect", async () => {
+            settings = { app: settings.app };
+            await chrome.storage.local.set({ settings });
+            notice = { text: "Disconnected. Selections stay here until you clear them." };
+            render();
+          }),
+        btn("Open Plax", () => openInApp("/library"), "btn ghost"),
+      ),
+    ),
     h(
       "section",
       { className: "card" },
@@ -444,7 +558,8 @@ function settings() {
 // ---------- Start ----------
 
 void (async () => {
-  const stored = await chrome.storage.local.get("session");
+  const stored = await chrome.storage.local.get(["session", "settings"]);
   if (stored.session) session = stored.session as Session;
+  if (stored.settings) settings = stored.settings as Settings;
   await findTarget();
 })();

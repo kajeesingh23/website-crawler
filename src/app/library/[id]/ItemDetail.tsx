@@ -137,7 +137,7 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
 
       {motion && (
         <Block title="Animation">
-          <MotionPanel motion={motion} image={thumb(item.thumbnail)} canSave={false} />
+          <MotionPanel motion={motion} image={thumb(item.thumbnail)} />
         </Block>
       )}
 

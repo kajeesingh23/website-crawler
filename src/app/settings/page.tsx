@@ -1,6 +1,8 @@
 import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
 import { dataDir } from "@/lib/db";
+import { getPairing } from "@/lib/pairing";
+import { Pairing } from "./Pairing";
 import { Theme } from "./Theme";
 
 export const metadata = { title: "Settings" };
@@ -22,8 +24,12 @@ export default function SettingsPage() {
 async function Status() {
   await connection(); // read the environment at request time, not at build time
   const claude = Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+  const pairing = getPairing();
   return (
     <>
+      <Section title="Browser extension" intro="Connect the Plax extension so it can save what you select straight into this Library.">
+        <Pairing state={!pairing ? "none" : pairing.origin ? "paired" : "waiting"} origin={pairing?.origin ?? null} />
+      </Section>
       <Section title="Claude" intro="Optional. Everything except AI recreation, AI edits and React conversion works without it.">
         <p className="text-sm">
           {claude ? (

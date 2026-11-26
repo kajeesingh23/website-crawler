@@ -396,7 +396,7 @@ function SaveComponent({ v, overrides }: { v: Version; overrides: Overrides }) {
     if (res?.ok) setState({ ok: true });
     else setState({ error: (await res?.json().catch(() => null))?.error ?? "Couldn't save. Is the app still running?" });
   }
-  if (state.ok) return <p className="rounded-xl bg-accent-soft px-4 py-3 text-sm">Saved to your library, with its code.</p>;
+  if (state.ok) return <p className="rounded-xl bg-accent-soft px-4 py-3 text-sm">Saved to your Library as its own item, with its code.</p>;
   return (
     <form onSubmit={save} className="flex flex-col gap-2 border-t border-line pt-5 sm:flex-row">
       <label htmlFor="component-name" className="sr-only">
@@ -407,11 +407,11 @@ function SaveComponent({ v, overrides }: { v: Version; overrides: Overrides }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
         maxLength={120}
-        placeholder="Name this component, e.g. Calm studio card"
+        placeholder="Name this version, e.g. Calm studio card, Claude version"
         className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-4 py-2 text-sm outline-none focus:border-accent"
       />
       <button type="submit" className="rounded-lg bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90">
-        Save component
+        Save this version
       </button>
       {state.error && (
         <p role="alert" className="text-sm text-danger sm:basis-full">

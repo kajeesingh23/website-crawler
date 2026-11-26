@@ -157,7 +157,9 @@ export function Explorer({ initialUrl, recent }: { initialUrl?: string; recent: 
                 <Chip onClick={() => send("clear")}>Clear</Chip>
               </div>
 
-<div role="tablist" aria-label="Details" className="mt-8 flex gap-1 border-b border-line">
+              <SaveCapture key={`save-${sel.id}`} suggested={`${sel.label}${snap?.title ? ` from ${snap.title}` : ""}`.slice(0, 120)} ready={!!sel.design} />
+
+              <div role="tablist" aria-label="Details" className="mt-8 flex gap-1 border-b border-line">
                 {TABS.map((t) => (
                   <button
                     key={t}
@@ -176,57 +178,57 @@ export function Explorer({ initialUrl, recent }: { initialUrl?: string; recent: 
               <div role="tabpanel" id="analyse-panel" aria-labelledby={`tab-${tab}`} className="pt-2">
                 {tab === "Design" && (
                   <>
-              {sel.design ? (
-                <Inspector design={sel.design} sample={sel.text.slice(0, 80)} />
-              ) : (
-                <p className="mt-8 text-sm text-muted">
-                  {sel.designFailed ? "This element's design couldn't be read. Try selecting the area around it." : "Reading the design…"}
-                </p>
-              )}
+                    {sel.design ? (
+                      <Inspector design={sel.design} sample={sel.text.slice(0, 80)} />
+                    ) : (
+                      <p className="mt-8 text-sm text-muted">
+                        {sel.designFailed ? "This element's design couldn't be read. Try selecting the area around it." : "Reading the design…"}
+                      </p>
+                    )}
                   </>
                 )}
                 {tab === "Motion" && (
                   <div className="pt-6">
-              <section>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="font-display text-2xl">Animation</h3>
-                    {sel.design && sel.motionStatus !== "done" && (
-                      <p className="text-sm text-muted">
-                        {sel.design.motion.moving > 0
-                          ? "Something here is moving right now."
-                          : sel.design.motion.smooth > 0
-                            ? "This is set up to change smoothly, probably on hover or scroll."
-                            : "No motion spotted yet. Exploring checks hover, focus and scrolling."}
-                      </p>
-                    )}
-                  </div>
-                  {sel.motionStatus !== "running" && (
-                    <button
-                      type="button"
-                      onClick={() => send("motion")}
-                      className="rounded-lg bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90"
-                    >
-                      {sel.motionStatus === "done" ? "Explore again" : "Explore animation"}
-                    </button>
-                  )}
-                </div>
-                {sel.motionStatus === "running" && (
-                  <p className="mt-3 text-sm text-muted" role="status">
-                    Watching how it moves… The website window will hover over it and scroll for a few seconds.
-                  </p>
-                )}
-                {sel.motionStatus === "failed" && (
-                  <p className="mt-3 text-sm text-danger" role="alert">
-                    Couldn’t watch this element. It may have disappeared; try selecting it again.
-                  </p>
-                )}
-                {sel.motionStatus === "done" && sel.motion && (
-                  <div className="mt-6">
-                    <MotionPanel key={sel.id} motion={sel.motion} image={sel.screenshot} />
-                  </div>
-                )}
-              </section>
+                    <section>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="font-display text-2xl">Animation</h3>
+                          {sel.design && sel.motionStatus !== "done" && (
+                            <p className="text-sm text-muted">
+                              {sel.design.motion.moving > 0
+                                ? "Something here is moving right now."
+                                : sel.design.motion.smooth > 0
+                                  ? "This is set up to change smoothly, probably on hover or scroll."
+                                  : "No motion spotted yet. Exploring checks hover, focus and scrolling."}
+                            </p>
+                          )}
+                        </div>
+                        {sel.motionStatus !== "running" && (
+                          <button
+                            type="button"
+                            onClick={() => send("motion")}
+                            className="rounded-lg bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90"
+                          >
+                            {sel.motionStatus === "done" ? "Explore again" : "Explore animation"}
+                          </button>
+                        )}
+                      </div>
+                      {sel.motionStatus === "running" && (
+                        <p className="mt-3 text-sm text-muted" role="status">
+                          Watching how it moves… The website window will hover over it and scroll for a few seconds.
+                        </p>
+                      )}
+                      {sel.motionStatus === "failed" && (
+                        <p className="mt-3 text-sm text-danger" role="alert">
+                          Couldn’t watch this element. It may have disappeared; try selecting it again.
+                        </p>
+                      )}
+                      {sel.motionStatus === "done" && sel.motion && (
+                        <div className="mt-6">
+                          <MotionPanel key={sel.id} motion={sel.motion} image={sel.screenshot} />
+                        </div>
+                      )}
+                    </section>
                   </div>
                 )}
                 {tab === "Recreate" && <RecreatePanel key={sel.id} sel={sel} />}
@@ -256,6 +258,50 @@ export function Explorer({ initialUrl, recent }: { initialUrl?: string; recent: 
         </section>
       </div>
     </div>
+  );
+}
+
+/** One Save per selection: its picture, exact copy, design and (if explored) its animation. */
+function SaveCapture({ suggested, ready }: { suggested: string; ready: boolean }) {
+  const [name, setName] = useState(suggested);
+  const [state, setState] = useState<{ id?: string; error?: string; busy?: boolean }>({});
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setState({ busy: true });
+    const res = await fetch("/api/session/save", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => null);
+    const json = await res?.json().catch(() => null);
+    setState(res?.ok ? { id: json.id } : { error: json?.error ?? "Couldn't save. Is the app still running?" });
+  }
+  if (state.id)
+    return (
+      <p className="mt-6 rounded-lg bg-accent-soft px-4 py-3 text-sm" role="status">
+        Saved to your Library.{" "}
+        <Link href={`/library/${state.id}`} className="font-medium text-accent hover:underline">
+          Open it
+        </Link>
+      </p>
+    );
+  return (
+    <form onSubmit={save} className="mt-6 flex flex-col gap-2 sm:flex-row">
+      <label htmlFor="capture-name" className="sr-only">
+        Name
+      </label>
+      <input
+        id="capture-name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        maxLength={120}
+        className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-4 py-2 text-sm outline-none focus:border-accent"
+      />
+      <button type="submit" disabled={!ready || state.busy || !name.trim()} className="rounded-lg bg-accent px-5 py-2 text-sm font-medium text-white disabled:opacity-60">
+        {state.busy ? "Saving…" : "Save to Library"}
+      </button>
+      {state.error && (
+        <p role="alert" className="text-sm text-danger sm:basis-full">
+          {state.error}
+        </p>
+      )}
+    </form>
   );
 }
 
