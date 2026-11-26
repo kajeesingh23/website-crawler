@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import type { Command, Snapshot } from "@/lib/inspector/session";
+import type { Command, Selection, Snapshot } from "@/lib/inspector/session";
 import type { RecentWebsite } from "@/lib/db";
 import { Inspector } from "./Inspector";
 import { MotionPanel } from "./Motion";
 import { RecreatePanel } from "./Recreate";
 import { ResponsivePanel } from "./Responsive";
+import { BuildPanel } from "@/components/BuildPanel";
 
-const TABS = ["Design", "Motion", "Recreate", "Sizes"] as const;
+const TABS = ["Design", "Motion", "Recreate", "Prompt & code", "Sizes"] as const;
 type Tab = (typeof TABS)[number];
 
 export function Explorer({ initialUrl, recent }: { initialUrl?: string; recent: RecentWebsite[] }) {
@@ -232,6 +233,11 @@ export function Explorer({ initialUrl, recent }: { initialUrl?: string; recent: 
                   </div>
                 )}
                 {tab === "Recreate" && <RecreatePanel key={sel.id} sel={sel} />}
+                {tab === "Prompt & code" && (
+                  <div className="pt-6">
+                    <LiveBuild key={`b-${sel.id}-${sel.motionStatus}`} sel={sel} page={snap?.url} />
+                  </div>
+                )}
                 {tab === "Sizes" && <ResponsivePanel key={`r-${sel.id}`} />}
               </div>
             </>
@@ -258,6 +264,39 @@ export function Explorer({ initialUrl, recent }: { initialUrl?: string; recent: 
         </section>
       </div>
     </div>
+  );
+}
+
+/** Build Prompt and code for the live selection, from its exact copy. */
+function LiveBuild({ sel, page }: { sel: Selection; page?: string }) {
+  const [html, setHtml] = useState<string>();
+  const [error, setError] = useState<string>();
+  useEffect(() => {
+    fetch("/api/session/snapshot")
+      .then(async (r) => {
+        const json = await r.json();
+        if (r.ok) setHtml(json.html);
+        else setError(json.error);
+      })
+      .catch(() => setError("The app isn't responding. Check that it's still running."));
+  }, []);
+  if (error) return <p role="alert" className="text-sm text-danger">{error}</p>;
+  if (!html) return <p className="text-sm text-muted" role="status">Making the exact copy…</p>;
+  return (
+    <BuildPanel
+      input={{
+        name: `${sel.label}${page ? ` from ${new URL(page).hostname.replace(/^www\./, "")}` : ""}`,
+        label: sel.label,
+        url: page,
+        text: sel.text,
+        width: sel.width,
+        height: sel.height,
+        design: sel.design ?? null,
+        motion: sel.motion,
+        motionTested: sel.motionStatus === "done",
+        html,
+      }}
+    />
   );
 }
 

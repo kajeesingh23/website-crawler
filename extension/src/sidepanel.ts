@@ -2,6 +2,8 @@
 // Built with DOM calls only (never innerHTML): page text ends up here, and this page has extension rights.
 import type { Capture, FromContent, Rect, ToContent } from "./shared";
 import { describeLayout } from "../../src/lib/inspector/describe";
+import { MODES, buildPrompt, type Mode } from "../../src/lib/export/prompt";
+import { componentName, designTokens, reactWrapper, toTailwind } from "../../src/lib/export/code";
 
 // ---------- State ----------
 
@@ -13,11 +15,16 @@ type Op =
   | { t: "move"; from: number; to: number };
 type Session = { captures: Capture[]; undo: Op[]; analyses?: Record<string, string> }; // analyses: page address → visit id
 type Settings = { app: string; token?: string; paired?: boolean };
-type View = { name: "main" } | { name: "detail"; id: string; tab: "design" | "copy" } | { name: "settings" };
+type DetailTab = "design" | "prompt" | "code" | "copy";
+type View = { name: "main" } | { name: "detail"; id: string; tab: DetailTab } | { name: "settings" };
+const FORMATS = { html: "HTML/CSS", tailwind: "Tailwind", tokens: "Tokens (JSON)", react: "React" } as const;
+type Format = keyof typeof FORMATS;
 
 let session: Session = { captures: [], undo: [] };
 let settings: Settings = { app: "http://localhost:3000" };
 let saving: string | null = null; // id of the capture being saved
+let promptMode: Mode = "pixel";
+let codeFormat: Format = "html";
 let view: View = { name: "main" };
 let selecting = false;
 let target: chrome.Tab | undefined; // the website tab this panel works on
@@ -398,10 +405,12 @@ function detail(v: Extract<View, { name: "detail" }>) {
     view = { name: "main" };
     return main();
   }
-  const tabs = [
+  const tabs: [DetailTab, string][] = [
     ["design", "Design"],
+    ["prompt", "Prompt"],
+    ["code", "Code"],
     ["copy", "Live copy"],
-  ] as const;
+  ];
   return h(
     "main",
     {},
@@ -439,7 +448,7 @@ function detail(v: Extract<View, { name: "detail" }>) {
         ),
       ),
     ),
-    h("section", { role: "tabpanel", className: "card" }, v.tab === "design" ? designFacts(c) : liveCopy(c)),
+    h("section", { role: "tabpanel", className: "card" }, { design: designFacts, prompt: promptTab, code: codeTab, copy: liveCopy }[v.tab](c)),
   );
 }
 
@@ -472,6 +481,61 @@ function designFacts(c: Capture) {
         h("div", { className: "swatches" }, ...d.palette.slice(0, 16).map((p) => h("span", { className: "swatch", title: p.hex, style: { background: p.hex } }))),
       ),
     h("p", { className: "muted small" }, "Hover and scroll effects aren't tested here: extensions can't move your mouse. Analyse Website in the Plax app tests them."),
+  );
+}
+
+/** A choice of options as a row of toggle buttons. */
+function choice<K extends string>(label: string, options: Record<K, string>, value: K, set: (k: K) => void) {
+  return h(
+    "div",
+    { className: "row", role: "group", "aria-label": label },
+    ...(Object.entries(options) as [K, string][]).map(([k, text]) =>
+      btn(text, () => (set(k), render()), `btn${k === value ? " primary" : ""}`, { "aria-pressed": String(k === value), "data-focus": `opt-${k}` }),
+    ),
+  );
+}
+
+function output(text: string, file: string, type: string) {
+  const copy = btn("Copy", async () => {
+    await navigator.clipboard.writeText(text);
+    copy.textContent = "Copied";
+    setTimeout(() => (copy.textContent = "Copy"), 1500);
+  }, "btn accent", { "data-focus": "copy" });
+  const download = btn(`Download ${file.slice(file.lastIndexOf("."))}`, () => {
+    const a = h("a", { href: URL.createObjectURL(new Blob([text], { type })), download: file });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  return h("div", { style: { display: "grid", gap: "6px" } }, h("div", { className: "row" }, copy, download), h("pre", { className: "out", tabIndex: 0, "aria-label": "Output" }, text));
+}
+
+const promptInput = (c: Capture) => ({ name: c.name, label: c.label, url: c.url, text: c.text, width: c.width, height: c.height, design: c.design, motion: c.motion, motionTested: false, html: c.html });
+
+function promptTab(c: Capture) {
+  return h(
+    "div",
+    { style: { display: "grid", gap: "8px" } },
+    h("p", { className: "muted small" }, "A ready-to-paste brief for Claude Code, Cursor, v0 or any AI tool, written from what was measured. No AI is used here."),
+    choice("What the prompt asks for", MODES, promptMode, (m) => (promptMode = m)),
+    output(buildPrompt(promptInput(c), promptMode), `${componentName(c.name)}-${promptMode}-prompt.md`, "text/markdown"),
+  );
+}
+
+function codeTab(c: Capture) {
+  const slug = componentName(c.name);
+  const files: Record<Format, [string, string, string]> = {
+    html: [c.html, `${slug}.html`, "text/html"],
+    tailwind: [toTailwind(c.html), `${slug}.tailwind.html`, "text/html"],
+    tokens: [JSON.stringify(designTokens(c.design, c.motion), null, 2), `${slug}.tokens.json`, "application/json"],
+    react: [reactWrapper(c.html, c.name), `${slug}.tsx`, "text/plain"],
+  };
+  return h(
+    "div",
+    { style: { display: "grid", gap: "8px" } },
+    choice("Format", FORMATS, codeFormat, (f) => (codeFormat = f)),
+    codeFormat === "react" &&
+      h("p", { className: "notice error small" }, "Made without AI: the exact copy inside a React component. For idiomatic React, save it and use Convert to React with Claude in the Plax app (needs a Claude key)."),
+    output(...files[codeFormat]),
   );
 }
 

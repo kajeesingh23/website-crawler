@@ -23,7 +23,7 @@ const TAB_EMPTY: Record<Props["tab"], string> = {
 };
 
 export const thumb = (t: string | null) => (t ? `/api/library/files/${t}` : undefined);
-export const day = (sqlDate: string) => new Date(`${sqlDate.replace(" ", "T")}Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+export const day = (sqlDate: string) => new Date(`${sqlDate.replace(" ", "T")}Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); // same on server and browser
 
 const KEYS = ["filter", "collection", "q", "website", "category", "tag", "from", "to"] as const;
 

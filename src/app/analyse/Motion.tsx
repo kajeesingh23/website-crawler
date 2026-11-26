@@ -44,8 +44,8 @@ export function MotionPanel({ motion, image }: { motion: Motion; image?: string 
 
       {(motion.running.length > 0 || motion.scriptedIdle) && (
         <Moment title="Moving on its own">
-          {motion.running.map((a) => (
-            <AnimCard key={a.key} a={a} image={image} />
+          {motion.running.map((a, n) => (
+            <AnimCard key={`${a.key}-${n}`} a={a} image={image} />
           ))}
           {motion.scriptedIdle && <Scripted />}
         </Moment>
@@ -139,8 +139,8 @@ function InteractionBlock({
         />
       )}
       <ChangeList changes={i.changes} transitions={transitions} />
-      {i.animations.map((a) => (
-        <AnimCard key={a.key} a={a} image={image} />
+      {i.animations.map((a, n) => (
+        <AnimCard key={`${a.key}-${n}`} a={a} image={image} />
       ))}
       {children}
     </Moment>

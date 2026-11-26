@@ -80,6 +80,18 @@ test("select several components on a page and manage the list", async () => {
   await selections().first().locator(".open").click();
   await panel.getByText("Layout").waitFor();
   assert.match(await panel.locator("dl.facts").innerText(), /#ffffff/i, "the first card's white background was measured");
+  await panel.getByRole("tab", { name: "Prompt" }).click();
+  assert.match(await panel.locator("pre.out").innerText(), /^# Pixel-accurate recreation: Card from localhost/);
+  await panel.getByRole("button", { name: "Design-system tokens" }).click();
+  assert.match(await panel.locator("pre.out").innerText(), /"\$type": "color"/);
+  const download = panel.waitForEvent("download");
+  await panel.getByRole("button", { name: "Download .md" }).click();
+  assert.equal((await download).suggestedFilename(), "CardFromLocalhost-tokens-prompt.md");
+  await panel.getByRole("tab", { name: "Code" }).click();
+  await panel.getByRole("button", { name: "Tailwind" }).click();
+  const tw = await panel.locator("pre.out").innerText();
+  assert.match(tw, /class="[^"]*bg-\[/);
+  assert.doesNotMatch(tw, / style="/);
   await panel.getByRole("tab", { name: "Live copy" }).click();
   const copy = await panel.locator("iframe.live").getAttribute("srcdoc");
   assert.match(copy ?? "", /First card/);

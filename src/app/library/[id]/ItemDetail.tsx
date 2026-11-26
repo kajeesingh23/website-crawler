@@ -11,6 +11,7 @@ import { Inspector } from "@/app/analyse/Inspector";
 import { MotionPanel } from "@/app/analyse/Motion";
 import { day, thumb } from "@/app/library/Board";
 import { SystemView } from "@/components/SystemView";
+import { BuildPanel } from "@/components/BuildPanel";
 import type { SystemData } from "@/lib/system/extract-system";
 
 const webUrl = (u: string | null) => (u && /^https?:\/\//i.test(u) ? u : undefined);
@@ -29,6 +30,7 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
   const design = item.observed.design as Design | undefined;
   const motion = item.observed.motion as Motion | undefined;
   const system = item.observed.system as SystemData | undefined;
+  const element = item.observed.element as { label?: string; width?: number; height?: number } | undefined;
   const inferred = item.inferred as { source?: string; confidence?: number; unknowns?: string[]; notes?: string; compare?: { match: boolean }[] };
   const latest = item.versions[0];
   const source = webUrl(item.sourceUrl);
@@ -159,7 +161,25 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
         </Block>
       )}
 
-      {(item.code.html || item.code.react) && <Code html={item.code.html} react={item.code.react} />}
+      {item.code.html ? (
+        <BuildPanel
+          itemId={item.id}
+          react={item.code.react}
+          input={{
+            name: item.name,
+            label: element?.label ?? item.category ?? "Component",
+            url: item.sourceUrl ?? undefined,
+            width: element?.width ?? design?.layout.width ?? 0,
+            height: element?.height ?? design?.layout.height ?? 0,
+            design: design ?? null,
+            motion,
+            motionTested: !!motion && item.observed.capturedWith !== "extension",
+            html: item.code.html,
+          }}
+        />
+      ) : (
+        item.code.react && <Code html={undefined} react={item.code.react} />
+      )}
 
       {design && (
         <Block title="Design, as measured">

@@ -139,6 +139,19 @@ export function saveComponent(c: {
   return id;
 }
 
+/** A new version of a saved item's code; earlier versions stay as they were. Returns the version number. */
+export function addVersion(itemId: string, files: { html: string; react?: string }, note: string, framework: string) {
+  const { n } = db().prepare("SELECT COALESCE(MAX(version), 0) + 1 AS n FROM item_versions WHERE item_id = ?").get(itemId) as { n: number };
+  const rel = `components/${itemId}/v${n}`;
+  fs.mkdirSync(path.join(dataDir, rel), { recursive: true });
+  fs.writeFileSync(path.join(dataDir, rel, "component.html"), files.html);
+  if (files.react) fs.writeFileSync(path.join(dataDir, rel, "Component.tsx"), files.react);
+  db()
+    .prepare("INSERT INTO item_versions (id, item_id, version, framework, code_path, change_note) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(randomUUID(), itemId, n, framework, rel, note);
+  return n;
+}
+
 export type RecentWebsite = { url: string; title: string | null; last_seen: string };
 
 export function getHomeData() {
