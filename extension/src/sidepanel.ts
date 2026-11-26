@@ -273,7 +273,10 @@ const hostOf = (u?: string) => {
 function render() {
   const focusId = (document.activeElement as HTMLElement | null)?.dataset?.focus;
   app.replaceChildren(header(), view.name === "detail" ? detail(view) : view.name === "settings" ? settingsView() : main());
-  if (focusId) (app.querySelector(`[data-focus="${CSS.escape(focusId)}"]`) as HTMLElement | null)?.focus(); // keyboard users keep their place
+  if (!focusId) return;
+  // Keyboard users keep their place; if that control is gone (an item was removed), they land on Undo.
+  const at = (id: string) => app.querySelector(`[data-focus="${CSS.escape(id)}"]:not(:disabled)`) as HTMLElement | null;
+  (at(focusId) ?? at("undo"))?.focus();
 }
 
 function header() {
@@ -385,7 +388,7 @@ function main() {
           { className: "tools" },
           btn("↑", () => move(i, i - 1), "btn icon ghost", { disabled: i === 0, "aria-label": `Move ${c.name} up`, "data-focus": `up-${c.id}` }),
           btn("↓", () => move(i, i + 1), "btn icon ghost", { disabled: i === list.length - 1, "aria-label": `Move ${c.name} down`, "data-focus": `down-${c.id}` }),
-          btn("✕", () => change({ t: "remove", capture: c, at: i }, () => list.splice(i, 1)), "btn icon ghost", { "aria-label": `Remove ${c.name}` }),
+          btn("✕", () => change({ t: "remove", capture: c, at: i }, () => list.splice(i, 1)), "btn icon ghost", { "aria-label": `Remove ${c.name}`, "data-focus": `rm-${c.id}` }),
         ),
       ),
     ),

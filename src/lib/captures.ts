@@ -1,9 +1,10 @@
 import { db, recordWebsite, saveComponent } from "./db.ts";
 import { describeForLibrary } from "./library.ts";
-import type { Selection } from "./inspector/session.ts";
+import { captureForRecreation, type Selection } from "./inspector/session.ts";
+import { buildDocument } from "./recreate/document.ts";
 
-// Saves one capture sent by the Plax extension. Everything arrives from outside the app, so each
-// field is checked before it's stored.
+// Saving captures: from the Plax extension (saveCapture) and from Analyse Website (saveLiveSelection).
+// Extension captures arrive from outside the app, so each field is checked before it's stored.
 
 const ASSET_LABELS = new Set(["Image", "Image link", "Image block", "Icon", "Illustration", "Video"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -60,6 +61,32 @@ export function saveCapture(body: unknown): { id: string } {
       motion,
       capturedWith: "extension", // hover, focus and scroll-in weren't tested
     },
+    inferred: {},
+  });
+  return { id };
+}
+
+/** The exact copy of the current selection in Analyse Website, as a standalone page. */
+export async function liveCopy() {
+  const { sel, url, snapshot } = await captureForRecreation();
+  return { sel, url, html: buildDocument(snapshot, sel.design.appearance.sitsOn, sel.motion) };
+}
+
+/** The one Save in Analyse Website: picture, exact copy, measured design and (if explored) animation. */
+export async function saveLiveSelection(name: string): Promise<{ id: string }> {
+  const title = name.trim();
+  if (!title || title.length > 120) throw new Invalid("Give it a name (up to 120 characters).");
+  const { sel, url, html } = await liveCopy();
+  const png = sel.screenshot?.startsWith(PNG) ? Buffer.from(sel.screenshot.slice(PNG.length), "base64") : undefined;
+  const id = saveComponent({
+    kind: ASSET_LABELS.has(sel.label) ? "asset" : "component",
+    name: title,
+    ...describeForLibrary(sel, url),
+    sourceUrl: url,
+    png,
+    html,
+    note: "Exact copy",
+    observed: { element: { label: sel.label, path: sel.path, width: sel.width, height: sel.height }, design: sel.design, motion: sel.motion },
     inferred: {},
   });
   return { id };

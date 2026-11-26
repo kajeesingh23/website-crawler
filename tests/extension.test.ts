@@ -110,6 +110,24 @@ test("the shipped extension asks only for what it needs", () => {
   assert.equal(m.version, JSON.parse(fs.readFileSync("package.json", "utf8")).version);
 });
 
+test("the panel works with a keyboard alone", async () => {
+  const focused = () => panel.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.textContent);
+  await panel.getByRole("button", { name: "Start selecting" }).focus();
+  await panel.keyboard.press("Space");
+  await panel.getByRole("button", { name: "Stop selecting" }).waitFor();
+  assert.equal(await focused(), "Stop selecting", "focus stays on the toggle");
+  await panel.keyboard.press("Enter");
+  await panel.getByRole("button", { name: "Start selecting" }).waitFor();
+
+  const count = await selections().count();
+  await panel.getByRole("button", { name: /^Remove / }).first().focus();
+  await panel.keyboard.press("Enter");
+  await panel.getByRole("heading", { name: `${count - 1} selected` }).waitFor();
+  assert.equal(await focused(), "Undo", "after removing, focus lands on Undo");
+  await panel.keyboard.press("Enter");
+  await panel.getByRole("heading", { name: `${count} selected` }).waitFor();
+});
+
 test("Esc on the page stops selecting", async () => {
   await panel.getByRole("button", { name: "Start selecting" }).click();
   await panel.getByRole("button", { name: "Stop selecting" }).waitFor();
