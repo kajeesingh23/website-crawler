@@ -1,4 +1,4 @@
-// Personal Design Intelligence — local MCP server.
+// Plax — local MCP server.
 // Lets Claude Code (or any MCP client) search and reuse your design library. Runs on this computer
 // only, talks over stdin/stdout, and never goes on the internet. Start: node mcp/server.ts
 import fs from "node:fs";
@@ -350,6 +350,7 @@ server.registerTool(
       react,
       note: what_changed,
       observed: src.observed,
+      variantOf: source_id,
       inferred: { source: "variation", of: source_id, notes: what_changed, note: "Written by Claude from a saved item; not measured." },
       category: src.category ?? undefined,
       tags: [...new Set([...src.tags, "variation"])],

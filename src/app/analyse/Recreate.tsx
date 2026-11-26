@@ -49,7 +49,7 @@ export function RecreatePanel({ sel }: { sel: Selection }) {
   }
 
   return (
-    <section className="mt-8 rounded-2xl border border-line p-5">
+    <section className="mt-8 rounded-xl border border-line p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="font-display text-2xl">Recreate</h3>
@@ -60,7 +60,7 @@ export function RecreatePanel({ sel }: { sel: Selection }) {
             type="button"
             disabled={!!busy || !sel.design}
             onClick={() => run("claude")}
-            className="rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-bg hover:opacity-90 disabled:opacity-60"
+            className="rounded-lg bg-ink px-5 py-2.5 text-sm font-medium text-bg hover:opacity-90 disabled:opacity-60"
           >
             {busy ? "Recreating…" : "Recreate This Component"}
           </button>
@@ -95,7 +95,7 @@ export function RecreatePanel({ sel }: { sel: Selection }) {
                   role="tab"
                   aria-selected={i === current}
                   onClick={() => setCurrent(i)}
-                  className={`rounded-full border px-3 py-1 text-sm ${i === current ? "border-ink bg-ink text-bg" : "border-line hover:border-muted"}`}
+                  className={`rounded-lg border px-3 py-1 text-sm ${i === current ? "border-ink bg-ink text-bg" : "border-line hover:border-muted"}`}
                 >
                   {i + 1}. {LABEL[x.source]}
                 </button>
@@ -131,7 +131,7 @@ export function RecreatePanel({ sel }: { sel: Selection }) {
 
 function Action({ busy, onClick, children }: { busy: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <button type="button" onClick={onClick} disabled={busy} className="rounded-full border border-line px-4 py-2 text-sm hover:border-muted disabled:opacity-60">
+    <button type="button" onClick={onClick} disabled={busy} className="rounded-lg border border-line px-4 py-2 text-sm hover:border-muted disabled:opacity-60">
       {busy ? "Working…" : children}
     </button>
   );
@@ -150,7 +150,7 @@ function SideBySide({ original, version, overrides, height }: { original?: strin
             type="button"
             aria-pressed={mode === m}
             onClick={() => setMode(m)}
-            className={`rounded-full px-3 py-1 ${mode === m ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
+            className={`rounded-lg px-3 py-1 ${mode === m ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
           >
             {m === "side" ? "Side by side" : "Overlay"}
           </button>
@@ -339,9 +339,9 @@ function Instruction({ busy, onSend }: { busy: boolean; onSend: (text: string) =
         onChange={(e) => setText(e.target.value)}
         maxLength={500}
         placeholder="Tell Claude what you want to change..."
-        className="min-w-0 flex-1 rounded-full border border-line bg-surface px-4 py-2 text-sm outline-none focus:border-accent"
+        className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-4 py-2 text-sm outline-none focus:border-accent"
       />
-      <button type="submit" disabled={busy} className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90 disabled:opacity-60">
+      <button type="submit" disabled={busy} className="rounded-lg bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90 disabled:opacity-60">
         {busy ? "Changing…" : "Change it"}
       </button>
     </form>
@@ -408,9 +408,9 @@ function SaveComponent({ v, overrides }: { v: Version; overrides: Overrides }) {
         onChange={(e) => setName(e.target.value)}
         maxLength={120}
         placeholder="Name this component, e.g. Calm studio card"
-        className="min-w-0 flex-1 rounded-full border border-line bg-surface px-4 py-2 text-sm outline-none focus:border-accent"
+        className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-4 py-2 text-sm outline-none focus:border-accent"
       />
-      <button type="submit" className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90">
+      <button type="submit" className="rounded-lg bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90">
         Save component
       </button>
       {state.error && (

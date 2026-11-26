@@ -198,7 +198,7 @@ export function SystemView({ system: s, images, selection, onToggle, onAll }: Pr
           </ul>
           <div className="mt-6">{head("breakpoints", "Breakpoints", s.breakpoints.length)}</div>
           <div className="flex flex-wrap gap-2">
-            {s.breakpoints.map((b, i) => pick("breakpoints", i, <span className="block rounded-full border border-line px-3 py-1 pr-8 text-sm tabular-nums">{b}px</span>, `${b}px`))}
+            {s.breakpoints.map((b, i) => pick("breakpoints", i, <span className="block rounded-lg border border-line px-3 py-1 pr-8 text-sm tabular-nums">{b}px</span>, `${b}px`))}
           </div>
           {s.unreadableStylesheets > 0 && (
             <p className="mt-2 text-xs text-muted">

@@ -84,9 +84,9 @@ export function DesignSystems() {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Paste a website link to collect its design system..."
-          className="min-w-0 flex-1 rounded-full border border-line bg-surface px-5 py-3 outline-none focus:border-accent"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-5 py-3 outline-none focus:border-accent"
         />
-        <button type="submit" disabled={busy} className="rounded-full bg-ink px-6 py-3 text-sm font-medium text-bg hover:opacity-90 disabled:opacity-60">
+        <button type="submit" disabled={busy} className="rounded-lg bg-ink px-6 py-3 text-sm font-medium text-bg hover:opacity-90 disabled:opacity-60">
           {busy ? "Collecting…" : "Collect Design System"}
         </button>
       </form>
@@ -103,7 +103,7 @@ export function DesignSystems() {
 
       {data && (
         <div className="mt-10 space-y-10">
-          <div className="flex flex-wrap items-start gap-6 rounded-2xl border border-line bg-surface p-5">
+          <div className="flex flex-wrap items-start gap-6 rounded-xl border border-line bg-surface p-5">
             {data.pageShot && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={data.pageShot} alt="The website's first screen" className="w-56 rounded-lg border border-line" />
@@ -114,7 +114,7 @@ export function DesignSystems() {
                 <div className="truncate text-sm text-muted">{data.system.url}</div>
               </div>
               <p className="text-sm text-muted">Untick anything you don’t want. Your choice applies to the download and to saving.</p>
-              <button type="button" onClick={download} className="rounded-full border border-line px-4 py-2 text-sm hover:border-muted">
+              <button type="button" onClick={download} className="rounded-lg border border-line px-4 py-2 text-sm hover:border-muted">
                 Download design.md
               </button>
               {saved ? (
@@ -134,9 +134,9 @@ export function DesignSystems() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     maxLength={120}
-                    className="min-w-0 flex-1 rounded-full border border-line bg-bg px-4 py-2 text-sm outline-none focus:border-accent"
+                    className="min-w-0 flex-1 rounded-lg border border-line bg-bg px-4 py-2 text-sm outline-none focus:border-accent"
                   />
-                  <button type="submit" className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90">
+                  <button type="submit" className="rounded-lg bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90">
                     Save to library
                   </button>
                 </form>

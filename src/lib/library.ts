@@ -38,6 +38,8 @@ export type Query = {
   tag?: string;
   from?: string; // YYYY-MM-DD
   to?: string;
+  kinds?: string[]; // only these kinds (a Library tab)
+  variations?: boolean; // only variations of other items
 };
 
 export type ItemCard = {
@@ -53,6 +55,7 @@ export type ItemCard = {
   site: string | null;
   createdAt: string;
   moves: boolean;
+  variantOf: string | null;
 };
 
 const STOP = new Set(
@@ -88,9 +91,11 @@ export function listItems(query: Query = {}): ItemCard[] {
   if (query.tag) add("EXISTS (SELECT 1 FROM json_each(i.tags) WHERE value = ?)", query.tag);
   if (query.from) add("date(i.created_at) >= date(?)", query.from);
   if (query.to) add("date(i.created_at) <= date(?)", query.to);
+  if (query.kinds?.length) add(`i.kind IN (${query.kinds.map(() => "?").join(",")})`, ...query.kinds);
+  if (query.variations) add("i.variant_of IS NOT NULL");
 
   const cols = `i.id, i.kind, i.name, i.description, ${CAT} AS category, i.tags, i.favourite, i.thumbnail, i.source_url,
-    i.created_at, COALESCE(w.title, w.url) AS site,
+    i.created_at, i.variant_of, COALESCE(w.title, w.url) AS site,
     (i.kind = 'animation' OR json_extract(i.observed, '$.motion') IS NOT NULL) AS moves`;
   const sql = fts
     ? `SELECT ${cols} FROM items_fts JOIN items i ON i.rowid = items_fts.rowid LEFT JOIN websites w ON w.id = i.website_id
@@ -111,6 +116,7 @@ export function listItems(query: Query = {}): ItemCard[] {
     site: (r.site as string) ?? null,
     createdAt: String(r.created_at),
     moves: Boolean(r.moves),
+    variantOf: (r.variant_of as string) ?? null,
   }));
 }
 
@@ -123,7 +129,20 @@ export function libraryCounts() {
     assets: n("SELECT COUNT(*) n FROM items WHERE kind = 'asset'"),
     designSystems: n("SELECT COUNT(*) n FROM items WHERE kind = 'design_system'"),
     favourites: n("SELECT COUNT(*) n FROM items WHERE favourite = 1"),
+    variations: n("SELECT COUNT(*) n FROM items WHERE variant_of IS NOT NULL"),
   };
+}
+
+/** Every website you've visited, with how much you saved from it and how many extension sessions it had. */
+export function listWebsites() {
+  return db()
+    .prepare(
+      `SELECT w.id, w.url, w.title, w.last_seen AS lastSeen,
+         (SELECT COUNT(*) FROM items i WHERE i.website_id = w.id) AS items,
+         (SELECT COUNT(*) FROM analyses a WHERE a.website_id = w.id) AS analyses
+       FROM websites w ORDER BY w.last_seen DESC`,
+    )
+    .all() as { id: string; url: string; title: string | null; lastSeen: string; items: number; analyses: number }[];
 }
 
 export function listCollections() {
@@ -132,7 +151,8 @@ export function listCollections() {
       `SELECT c.id, c.name, COUNT(ci.item_id) AS count FROM collections c
        LEFT JOIN collection_items ci ON ci.collection_id = c.id GROUP BY c.id ORDER BY c.created_at DESC, c.rowid DESC`,
     )
-    .all() as { id: string; name: string; count: number }[];
+    .all()
+    .map((r) => ({ ...r })) as { id: string; name: string; count: number }[]; // plain objects, so they can go to the browser
 }
 
 /** Choices for the library's filters: only websites, categories and tags that are actually used. */
@@ -141,7 +161,8 @@ export function filterOptions() {
   return {
     websites: d
       .prepare("SELECT DISTINCT w.id, COALESCE(w.title, w.url) AS name FROM websites w JOIN items i ON i.website_id = w.id ORDER BY name")
-      .all() as { id: string; name: string }[],
+      .all()
+      .map((r) => ({ ...r })) as { id: string; name: string }[],
     categories: (d.prepare(`SELECT DISTINCT ${CAT} AS c FROM items i WHERE c IS NOT NULL ORDER BY c`).all() as { c: string }[]).map((r) => r.c),
     tags: (d.prepare("SELECT DISTINCT value AS t FROM items, json_each(items.tags) ORDER BY t").all() as { t: string }[]).map((r) => r.t),
   };

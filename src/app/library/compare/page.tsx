@@ -5,7 +5,7 @@ import type { Colour, Design } from "@/lib/inspector/extract";
 import type { Motion } from "@/lib/inspector/session";
 import { describeLayout, describeMovement, movementBetween, weightName } from "@/lib/inspector/describe";
 
-export default function ComparePage({ searchParams }: PageProps<"/board/compare">) {
+export default function ComparePage({ searchParams }: PageProps<"/library/compare">) {
   return (
     <Suspense fallback={null}>
       <Compare searchParams={searchParams} />
@@ -32,16 +32,16 @@ const hover = (m?: Motion) => {
   return [move, others ? `${others} other change${others > 1 ? "s" : ""}` : ""].filter(Boolean).join(", ");
 };
 
-async function Compare({ searchParams }: Pick<PageProps<"/board/compare">, "searchParams">) {
+async function Compare({ searchParams }: Pick<PageProps<"/library/compare">, "searchParams">) {
   const raw = (await searchParams).ids;
   const items = (typeof raw === "string" ? raw.split(",") : []).slice(0, 4).map(getItem).filter((i): i is ItemDetail => !!i);
   if (items.length < 2)
     return (
       <div className="mx-auto max-w-3xl">
         <h1 className="font-display text-4xl">Compare</h1>
-        <p className="mt-3 text-muted">Select 2 to 4 items on My Board, then press Compare.</p>
-        <Link href="/board" className="mt-5 inline-block text-accent hover:underline">
-          Back to My Board
+        <p className="mt-3 text-muted">Select 2 to 4 items in your Library, then press Compare.</p>
+        <Link href="/library" className="mt-5 inline-block text-accent hover:underline">
+          Back to Library
         </Link>
       </div>
     );
@@ -65,8 +65,8 @@ async function Compare({ searchParams }: Pick<PageProps<"/board/compare">, "sear
 
   return (
     <div className="mx-auto max-w-7xl">
-      <Link href="/board" className="text-sm text-muted hover:text-ink">
-        ← My Board
+      <Link href="/library" className="text-sm text-muted hover:text-ink">
+        ← Library
       </Link>
       <h1 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">Compare</h1>
       <div className="mt-6 overflow-x-auto">

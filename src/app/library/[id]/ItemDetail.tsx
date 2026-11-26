@@ -7,9 +7,9 @@ import * as A from "@/app/actions";
 import type { ItemDetail } from "@/lib/library";
 import type { Design } from "@/lib/inspector/extract";
 import type { Motion } from "@/lib/inspector/session";
-import { Inspector } from "@/app/explore/Inspector";
-import { MotionPanel } from "@/app/explore/Motion";
-import { day, thumb } from "@/app/board/Board";
+import { Inspector } from "@/app/analyse/Inspector";
+import { MotionPanel } from "@/app/analyse/Motion";
+import { day, thumb } from "@/app/library/Board";
 import { SystemView } from "@/components/SystemView";
 import type { SystemData } from "@/lib/system/extract-system";
 
@@ -36,8 +36,8 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
   return (
     <div className={`mx-auto max-w-5xl space-y-10 ${pending ? "opacity-80" : ""}`}>
       <div>
-        <Link href="/board" className="text-sm text-muted hover:text-ink">
-          ← My Board
+        <Link href="/library" className="text-sm text-muted hover:text-ink">
+          ← Library
         </Link>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
@@ -68,7 +68,7 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
             type="button"
             aria-pressed={item.favourite}
             onClick={() => act(() => A.setFavourite(item.id, !item.favourite))}
-            className={`rounded-full border px-4 py-2 text-sm ${item.favourite ? "border-amber-400 text-amber-600" : "border-line hover:border-muted"}`}
+            className={`rounded-lg border px-4 py-2 text-sm ${item.favourite ? "border-amber-400 text-amber-600" : "border-line hover:border-muted"}`}
           >
             {item.favourite ? "★ Favourite" : "☆ Add to favourites"}
           </button>
@@ -84,12 +84,12 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
       {item.description && <p className="text-lg">{item.description}</p>}
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <button type="button" onClick={() => act(() => A.duplicateItem(item.id), (id) => id && router.push(`/library/${id}`))} className="rounded-full border border-line px-4 py-2 hover:border-muted">
+        <button type="button" onClick={() => act(() => A.duplicateItem(item.id), (id) => id && router.push(`/library/${id}`))} className="rounded-lg border border-line px-4 py-2 hover:border-muted">
           Duplicate
         </button>
         {latest?.codePath &&
           latest.files.map((f) => (
-            <a key={f} href={`/api/library/files/${latest.codePath}/${f}?download`} className="rounded-full border border-line px-4 py-2 hover:border-muted">
+            <a key={f} href={`/api/library/files/${latest.codePath}/${f}?download`} className="rounded-lg border border-line px-4 py-2 hover:border-muted">
               Export {f}
             </a>
           ))}
@@ -97,9 +97,9 @@ export function ItemDetailView({ item, collections }: { item: ItemDetail; collec
         <button
           type="button"
           onClick={() => {
-            if (confirm(`Delete “${item.name}” for good? This removes its screenshot and code and can't be undone.`)) act(() => A.deleteItems([item.id]), () => router.push("/board"));
+            if (confirm(`Delete “${item.name}” for good? This removes its screenshot and code and can't be undone.`)) act(() => A.deleteItems([item.id]), () => router.push("/library"));
           }}
-          className="ml-auto rounded-full border border-line px-4 py-2 text-danger hover:border-danger"
+          className="ml-auto rounded-lg border border-line px-4 py-2 text-danger hover:border-danger"
         >
           Delete
         </button>
@@ -203,7 +203,7 @@ function Preview({ item }: { item: ItemDetail }) {
       <div className="grid gap-3 md:grid-cols-2">
         <figure>
           <figcaption className="mb-1 text-xs text-muted">Original website</figcaption>
-          <div className="flex h-80 items-center justify-center overflow-hidden rounded-2xl border border-line bg-bg p-4">
+          <div className="flex h-80 items-center justify-center overflow-hidden rounded-xl border border-line bg-bg p-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {src ? <img src={src} alt="The original" className="max-h-full max-w-full object-contain" /> : <span className="text-sm text-muted">No screenshot</span>}
           </div>
@@ -211,12 +211,12 @@ function Preview({ item }: { item: ItemDetail }) {
         <figure>
           <figcaption className="mb-1 text-xs text-muted">Your component (live, try hovering)</figcaption>
           {/* sandbox with no permissions: saved code can never run scripts in this app */}
-          <iframe title={item.name} sandbox="" srcDoc={item.code.html} className="h-80 w-full rounded-2xl border border-line bg-white" />
+          <iframe title={item.name} sandbox="" srcDoc={item.code.html} className="h-80 w-full rounded-xl border border-line bg-white" />
         </figure>
       </div>
     );
   return (
-    <div className="flex max-h-[32rem] min-h-64 items-center justify-center overflow-hidden rounded-2xl border border-line bg-bg p-6">
+    <div className="flex max-h-[32rem] min-h-64 items-center justify-center overflow-hidden rounded-xl border border-line bg-bg p-6">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {src ? <img src={src} alt={item.name} className="max-h-[30rem] max-w-full object-contain" /> : <span className="text-muted">No preview</span>}
     </div>
@@ -238,14 +238,14 @@ function AddToCollection({
   const member = collections.filter((c) => inCollections.includes(c.id));
   if (!collections.length)
     return (
-      <Link href="/board" className="rounded-full border border-line px-4 py-2 hover:border-muted">
-        Create a collection on My Board
+      <Link href="/library" className="rounded-lg border border-line px-4 py-2 hover:border-muted">
+        Create a collection in your Library
       </Link>
     );
   return (
     <span className="flex flex-wrap items-center gap-2">
       {member.map((c) => (
-        <span key={c.id} className="rounded-full bg-accent-soft px-3 py-1.5 text-xs">
+        <span key={c.id} className="rounded-lg bg-accent-soft px-3 py-1.5 text-xs">
           {c.name}
           <button type="button" aria-label={`Remove from ${c.name}`} onClick={() => act(() => A.removeFromCollection(c.id, [itemId]))} className="ml-1.5 text-muted hover:text-ink">
             ×
@@ -257,7 +257,7 @@ function AddToCollection({
           aria-label="Add to collection"
           value=""
           onChange={(e) => e.target.value && act(() => A.addToCollection(e.target.value, [itemId]))}
-          className="rounded-full border border-line bg-surface px-3 py-2"
+          className="rounded-lg border border-line bg-surface px-3 py-2"
         >
           <option value="">Add to collection…</option>
           {available.map((c) => (
@@ -319,7 +319,7 @@ function Similar({ id }: { id: string }) {
   return (
     <Block title="Looks similar">
       {!state.items && (
-        <button type="button" onClick={load} disabled={state.busy} className="rounded-full border border-line px-4 py-2 text-sm hover:border-muted disabled:opacity-60">
+        <button type="button" onClick={load} disabled={state.busy} className="rounded-lg border border-line px-4 py-2 text-sm hover:border-muted disabled:opacity-60">
           {state.busy ? "Comparing pictures…" : "Find items that look like this"}
         </button>
       )}

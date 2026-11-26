@@ -32,7 +32,7 @@ export function MotionPanel({ motion, image, canSave = true }: { motion: Motion;
 
   return (
     <div className="space-y-10">
-      <p className="inline-block rounded-full bg-accent-soft px-3 py-1 text-xs font-medium">Observed on the page, not guessed</p>
+      <p className="inline-block rounded-lg bg-accent-soft px-3 py-1 text-xs font-medium">Observed on the page, not guessed</p>
 
       {nothing && (
         <p className="text-muted">
@@ -323,20 +323,20 @@ function Player({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-line p-3 text-sm">
-        <button type="button" onClick={toggle} className="rounded-full border border-line px-3 py-1 hover:border-muted">
+        <button type="button" onClick={toggle} className="rounded-lg border border-line px-3 py-1 hover:border-muted">
           {playing ? "Pause" : "Play"}
         </button>
-        <button type="button" onClick={replay} className="rounded-full border border-line px-3 py-1 hover:border-muted">
+        <button type="button" onClick={replay} className="rounded-lg border border-line px-3 py-1 hover:border-muted">
           Replay
         </button>
-        <div role="group" aria-label="Speed" className="flex rounded-full border border-line p-0.5">
+        <div role="group" aria-label="Speed" className="flex rounded-lg border border-line p-0.5">
           {[0.25, 0.5, 1, 2].map((v) => (
             <button
               key={v}
               type="button"
               aria-pressed={speed === v}
               onClick={() => changeSpeed(v)}
-              className={`rounded-full px-2.5 py-0.5 text-xs ${speed === v ? "bg-ink text-bg" : "text-muted"}`}
+              className={`rounded-lg px-2.5 py-0.5 text-xs ${speed === v ? "bg-ink text-bg" : "text-muted"}`}
             >
               {v}×
             </button>
@@ -391,9 +391,9 @@ function SaveAnimation() {
         onChange={(e) => setName(e.target.value)}
         placeholder="Name this animation, e.g. Soft hover lift"
         maxLength={120}
-        className="min-w-0 flex-1 rounded-full border border-line bg-surface px-4 py-2 text-sm outline-none focus:border-accent"
+        className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-4 py-2 text-sm outline-none focus:border-accent"
       />
-      <button type="submit" className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90">
+      <button type="submit" className="rounded-lg bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90">
         Save animation
       </button>
       {state.error && (

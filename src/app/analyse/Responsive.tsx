@@ -16,13 +16,13 @@ export function ResponsivePanel() {
   const differs = (s: SizeResult, key: "size" | "fontSize" | "padding" | "layout") => desktop?.found && s.found && s[key] !== desktop[key];
 
   return (
-    <section className="mt-8 rounded-2xl border border-line p-5">
+    <section className="mt-8 rounded-xl border border-line p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="font-display text-2xl">Screen sizes</h3>
           <p className="text-sm text-muted">How it looks on a phone, a tablet and a desktop.</p>
         </div>
-        <button type="button" onClick={run} disabled={state.busy} className="rounded-full border border-line px-4 py-2 text-sm hover:border-muted disabled:opacity-60">
+        <button type="button" onClick={run} disabled={state.busy} className="rounded-lg border border-line px-4 py-2 text-sm hover:border-muted disabled:opacity-60">
           {state.busy ? "Checking…" : state.sizes ? "Check again" : "Check screen sizes"}
         </button>
       </div>

@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Command, Snapshot } from "@/lib/inspector/session";
+import type { RecentWebsite } from "@/lib/db";
 import { Inspector } from "./Inspector";
 import { MotionPanel } from "./Motion";
 import { RecreatePanel } from "./Recreate";
 import { ResponsivePanel } from "./Responsive";
 
-const NEXT_UP = ["Save assets", "Browse and organise everything on My Board"];
+const TABS = ["Design", "Motion", "Recreate", "Sizes"] as const;
+type Tab = (typeof TABS)[number];
 
-export function Explorer({ initialUrl }: { initialUrl?: string }) {
+export function Explorer({ initialUrl, recent }: { initialUrl?: string; recent: RecentWebsite[] }) {
+  const [tab, setTab] = useState<Tab>("Design");
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [url, setUrl] = useState(initialUrl ?? "");
   const [error, setError] = useState<string>();
@@ -64,7 +68,11 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <h1 className="font-display text-4xl tracking-tight md:text-5xl">Explore a website</h1>
+      <h1 className="font-display text-4xl tracking-tight md:text-5xl">Analyse a website</h1>
+      <p className="mt-2 max-w-2xl text-muted">
+        Select what you like on any website, see how it&rsquo;s built, and save it to your Library. The Plax extension does this right inside
+        Chrome; here, the website opens in its own window instead.
+      </p>
       <form onSubmit={submit} className="mt-6 flex flex-col gap-2 sm:flex-row">
         <label htmlFor="url" className="sr-only">
           Website link
@@ -73,16 +81,16 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
           id="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="Paste a website link to explore..."
-          className="min-w-0 flex-1 rounded-full border border-line bg-surface px-5 py-3 outline-none focus:border-accent"
+          placeholder="Paste a website link to analyse..."
+          className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-5 py-3 outline-none focus:border-accent"
           autoComplete="url"
         />
         <button
           type="submit"
           disabled={busy}
-          className="rounded-full bg-ink px-6 py-3 text-sm font-medium text-bg hover:opacity-90 disabled:opacity-60"
+          className="rounded-lg bg-ink px-6 py-3 text-sm font-medium text-bg hover:opacity-90 disabled:opacity-60"
         >
-          {busy ? "Opening…" : "Explore Website"}
+          {busy ? "Opening…" : "Analyse Website"}
         </button>
       </form>
 
@@ -93,13 +101,13 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
       )}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-        <section className="rounded-2xl border border-line bg-surface p-6">
+        <section className="rounded-xl border border-line bg-surface p-6">
           <Status snap={snap} />
           {isOpen && (
             <div className="mt-6 flex flex-wrap gap-2">
               <button
                 onClick={() => send(snap.inspecting ? "inspect-off" : "inspect-on")}
-                className={`rounded-full px-5 py-2.5 text-sm font-medium ${
+                className={`rounded-lg px-5 py-2.5 text-sm font-medium ${
                   snap.inspecting ? "bg-accent text-white" : "bg-ink text-bg"
                 }`}
               >
@@ -107,7 +115,7 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
               </button>
               <button
                 onClick={() => fetch("/api/session", { method: "DELETE" })}
-                className="rounded-full border border-line px-5 py-2.5 text-sm hover:border-muted"
+                className="rounded-lg border border-line px-5 py-2.5 text-sm hover:border-muted"
               >
                 Close website
               </button>
@@ -120,7 +128,7 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
           </ol>
         </section>
 
-        <section className="rounded-2xl border border-line bg-surface p-6" aria-live="polite">
+        <section className="rounded-xl border border-line bg-surface p-6" aria-live="polite">
           {sel ? (
             <>
               <div className="flex aspect-[16/10] items-center justify-center overflow-hidden rounded-xl border border-line bg-[repeating-conic-gradient(var(--line)_0_25%,transparent_0_50%)] bg-[length:16px_16px]">
@@ -149,7 +157,37 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
                 <Chip onClick={() => send("clear")}>Clear</Chip>
               </div>
 
-              <section className="mt-8 rounded-2xl border border-line p-5">
+<div role="tablist" aria-label="Details" className="mt-8 flex gap-1 border-b border-line">
+                {TABS.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    role="tab"
+                    id={`tab-${t}`}
+                    aria-selected={tab === t}
+                    aria-controls="analyse-panel"
+                    onClick={() => setTab(t)}
+                    className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === t ? "border-accent font-medium" : "border-transparent text-muted hover:text-ink"}`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <div role="tabpanel" id="analyse-panel" aria-labelledby={`tab-${tab}`} className="pt-2">
+                {tab === "Design" && (
+                  <>
+              {sel.design ? (
+                <Inspector design={sel.design} sample={sel.text.slice(0, 80)} />
+              ) : (
+                <p className="mt-8 text-sm text-muted">
+                  {sel.designFailed ? "This element's design couldn't be read. Try selecting the area around it." : "Reading the design…"}
+                </p>
+              )}
+                  </>
+                )}
+                {tab === "Motion" && (
+                  <div className="pt-6">
+              <section>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="font-display text-2xl">Animation</h3>
@@ -167,7 +205,7 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
                     <button
                       type="button"
                       onClick={() => send("motion")}
-                      className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90"
+                      className="rounded-lg bg-ink px-5 py-2 text-sm font-medium text-bg hover:opacity-90"
                     >
                       {sel.motionStatus === "done" ? "Explore again" : "Explore animation"}
                     </button>
@@ -189,33 +227,48 @@ export function Explorer({ initialUrl }: { initialUrl?: string }) {
                   </div>
                 )}
               </section>
-
-              <RecreatePanel key={sel.id} sel={sel} />
-              <ResponsivePanel key={`r-${sel.id}`} />
-
-              {sel.design ? (
-                <Inspector design={sel.design} sample={sel.text.slice(0, 80)} />
-              ) : (
-                <p className="mt-8 text-sm text-muted">
-                  {sel.designFailed ? "This element's design couldn't be read. Try selecting the area around it." : "Reading the design…"}
-                </p>
-              )}
-
-              <div className="mt-10 border-t border-line pt-5">
-                <h3 className="text-sm font-medium">Coming in the next phases</h3>
-                <p className="mt-2 text-sm text-muted">{NEXT_UP.join(" · ")}</p>
+                  </div>
+                )}
+                {tab === "Recreate" && <RecreatePanel key={sel.id} sel={sel} />}
+                {tab === "Sizes" && <ResponsivePanel key={`r-${sel.id}`} />}
               </div>
             </>
           ) : (
-            <div className="flex h-full min-h-64 flex-col items-center justify-center text-center">
-              <div className="font-medium">Nothing selected yet</div>
-              <p className="mt-1 max-w-xs text-sm text-muted">
-                Turn on selecting, hover over the website, and click anything you like.
-              </p>
+            <div className="flex h-full min-h-64 flex-col justify-center">
+              <div className="text-center">
+                <div className="font-medium">Nothing selected yet</div>
+                <p className="mx-auto mt-1 max-w-xs text-sm text-muted">Turn on selecting, hover over the website, and click anything you like.</p>
+              </div>
+              {!isOpen && recent.length > 0 && (
+                <Recent>
+                  {recent.map((w) => (
+                    <li key={w.url}>
+                      <button type="button" onClick={() => (setUrl(w.url), void open(w.url))} className="block w-full px-4 py-3 text-left hover:bg-bg">
+                        <span className="block truncate text-sm font-medium">{w.title || w.url}</span>
+                        <span className="block truncate text-xs text-muted">{w.url}</span>
+                      </button>
+                    </li>
+                  ))}
+                </Recent>
+              )}
             </div>
           )}
         </section>
       </div>
+    </div>
+  );
+}
+
+function Recent({ children }: { children: ReactNode }) {
+  return (
+    <div className="mt-8">
+      <div className="mb-2 flex items-baseline justify-between text-xs text-muted">
+        <span>Recently analysed</span>
+        <Link href="/library?tab=websites" className="text-accent hover:underline">
+          All websites
+        </Link>
+      </div>
+      <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">{children}</ul>
     </div>
   );
 }
@@ -226,7 +279,7 @@ function Status({ snap }: { snap: Snapshot | null }) {
     idle: "No website open yet.",
     opening: "Opening the website…",
     open: snap.inspecting ? "Selecting: hover and click on the website." : "Open in its own window.",
-    closed: "The website window was closed. Explore a link to open it again.",
+    closed: "The website window was closed. Analyse a link to open it again.",
     error: "Couldn't open that website.",
   };
   return (
@@ -260,7 +313,7 @@ function Step({ n, text }: { n: number; text: string }) {
 
 function Chip({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} className="rounded-full border border-line px-4 py-2 hover:border-muted">
+    <button onClick={onClick} className="rounded-lg border border-line px-4 py-2 hover:border-muted">
       {children}
     </button>
   );

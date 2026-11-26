@@ -3,34 +3,45 @@
 import Link from "next/link";
 import { useState, useTransition, type DragEvent, type FormEvent } from "react";
 import * as A from "@/app/actions";
-import type { Filter, ItemCard } from "@/lib/library";
+import type { Filter, ItemCard, Query } from "@/lib/library";
 
 type Props = {
+  tab: "components" | "assets" | "variations" | "design-systems";
   items: ItemCard[];
-  counts: { total: number; components: number; animations: number; assets: number; designSystems: number; favourites: number };
+  total: number;
   collections: { id: string; name: string; count: number }[];
-  filters: [Filter, string][];
-  active: { filter: Filter; collection?: string; q?: string };
+  filters?: [Filter, string][];
+  options?: { websites: { id: string; name: string }[]; categories: string[]; tags: string[] };
+  active: Query;
+};
+
+const TAB_EMPTY: Record<Props["tab"], string> = {
+  components: "Analyse a website, select something you like, and save it. It appears here.",
+  assets: "Images, icons and illustrations you save from a website appear here.",
+  variations: "Customise a saved component and save it as a variation. The original never changes.",
+  "design-systems": "Collect a website's colours, type and spacing below, then save it.",
 };
 
 export const thumb = (t: string | null) => (t ? `/api/library/files/${t}` : undefined);
 export const day = (sqlDate: string) => new Date(`${sqlDate.replace(" ", "T")}Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 
-export function Board({ items, counts, collections, filters, active }: Props) {
+const KEYS = ["filter", "collection", "q", "website", "category", "tag", "from", "to"] as const;
+
+export function Board({ tab, items, total, collections, filters, options, active }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<{ id: string; place: "before" | "after" } | null>(null);
   const current = collections.find((c) => c.id === active.collection);
+  const searching = KEYS.some((k) => k !== "filter" && active[k]);
 
-  const href = (patch: Partial<Props["active"]>) => {
+  const href = (patch: Partial<Query>) => {
     const p = new URLSearchParams();
+    if (tab !== "components") p.set("tab", tab);
     const next = { ...active, ...patch };
-    if (next.filter && next.filter !== "all") p.set("filter", next.filter);
-    if (next.collection) p.set("collection", next.collection);
-    if (next.q) p.set("q", next.q);
-    return `/board${p.size ? `?${p}` : ""}`;
+    for (const k of KEYS) if (next[k] && !(k === "filter" && next[k] === "all")) p.set(k, String(next[k]));
+    return `/library${p.size ? `?${p}` : ""}`;
   };
   const act = (fn: () => Promise<{ error?: string }>, after?: () => void) =>
     start(async () => {
@@ -57,47 +68,73 @@ export function Board({ items, counts, collections, filters, active }: Props) {
     setDragId(null);
     setDropAt(null);
   };
+  const select = "rounded-lg border border-line bg-surface px-2 py-1.5 text-sm";
 
   return (
-    <div className="mx-auto max-w-7xl">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-4xl tracking-tight md:text-5xl">My Board</h1>
-          <p className="mt-2 text-sm text-muted">
-            {counts.total} saved · {counts.components} components · {counts.animations} animations · {counts.assets} assets · {counts.designSystems}{" "}
-            design systems · {counts.favourites} favourites
-          </p>
-        </div>
-        <form action="/board" className="flex w-full gap-2 sm:w-auto">
-          {active.filter !== "all" && <input type="hidden" name="filter" value={active.filter} />}
-          {active.collection && <input type="hidden" name="collection" value={active.collection} />}
-          <label htmlFor="board-search" className="sr-only">
-            Search your board
-          </label>
-          <input
-            id="board-search"
-            name="q"
-            defaultValue={active.q}
-            placeholder="Find the animated card from a portfolio site…"
-            className="min-w-0 flex-1 rounded-full border border-line bg-surface px-4 py-2 text-sm outline-none focus:border-accent sm:w-80"
-          />
-        </form>
-      </div>
+    <div>
+      <form action="/library" className="space-y-3">
+        {tab !== "components" && <input type="hidden" name="tab" value={tab} />}
+        {active.filter && active.filter !== "all" && <input type="hidden" name="filter" value={active.filter} />}
+        {active.collection && <input type="hidden" name="collection" value={active.collection} />}
+        <label htmlFor="board-search" className="sr-only">
+          Search your library
+        </label>
+        <input
+          id="board-search"
+          name="q"
+          defaultValue={active.q}
+          placeholder="Search in your own words, e.g. the animated card from a portfolio site"
+          className="w-full rounded-lg border border-line bg-surface px-4 py-2.5 text-sm outline-none focus:border-accent"
+        />
+        {options && (
+          <div className="flex flex-wrap items-center gap-2">
+            <select name="website" defaultValue={active.website ?? ""} aria-label="Website" className={select}>
+              <option value="">Any website</option>
+              {options.websites.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+            <select name="category" defaultValue={active.category ?? ""} aria-label="Kind of element" className={select}>
+              <option value="">Any kind</option>
+              {options.categories.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+            <select name="tag" defaultValue={active.tag ?? ""} aria-label="Tag" className={select}>
+              <option value="">Any tag</option>
+              {options.tags.map((t) => (
+                <option key={t}>{t}</option>
+              ))}
+            </select>
+            <label className="flex items-center gap-1 text-sm text-muted">
+              From <input type="date" name="from" defaultValue={active.from} className={select} />
+            </label>
+            <label className="flex items-center gap-1 text-sm text-muted">
+              to <input type="date" name="to" defaultValue={active.to} className={select} />
+            </label>
+            <button type="submit" className="rounded-lg bg-ink px-4 py-1.5 text-sm font-medium text-bg">
+              Search
+            </button>
+          </div>
+        )}
+      </form>
 
-      <nav aria-label="Filters" className="mt-6 flex flex-wrap gap-2">
-        {filters.map(([key, label]) => (
+      <nav aria-label="Filters" className="mt-4 flex flex-wrap gap-2">
+        {filters?.map(([key, label]) => (
           <Link
             key={key}
             href={href({ filter: key })}
             aria-current={active.filter === key ? "page" : undefined}
-            className={`rounded-full border px-3 py-1.5 text-sm ${active.filter === key ? "border-ink bg-ink text-bg" : "border-line text-muted hover:text-ink"}`}
+            className={`rounded-lg border px-3 py-1.5 text-sm ${active.filter === key ? "border-ink bg-ink text-bg" : "border-line text-muted hover:text-ink"}`}
           >
             {label}
           </Link>
         ))}
-        {active.q && (
-          <Link href={href({ q: undefined })} className="rounded-full px-3 py-1.5 text-sm text-accent hover:underline">
-            Clear search “{active.q}”
+        {searching && (
+          <Link href={href({ q: undefined, website: undefined, category: undefined, tag: undefined, from: undefined, to: undefined })} className="rounded-lg px-3 py-1.5 text-sm text-accent hover:underline">
+            {active.q ? `Clear search “${active.q}”` : "Clear filters"}
           </Link>
         )}
       </nav>
@@ -116,16 +153,14 @@ export function Board({ items, counts, collections, filters, active }: Props) {
           )}
 
           {items.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-line px-6 py-16 text-center">
-              <div className="font-medium">{counts.total ? "Nothing matches here" : "Your board is waiting"}</div>
+            <div className="rounded-xl border border-dashed border-line px-6 py-16 text-center">
+              <div className="font-medium">{total ? "Nothing matches here" : "Nothing here yet"}</div>
               <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
-                {counts.total
-                  ? "Try another filter or search, or pick a different collection."
-                  : "Explore a website, select something you like, and save its animation or a recreated component. It appears here."}
+                {total ? "Try another filter or search, or pick a different collection." : TAB_EMPTY[tab]}
               </p>
-              {!counts.total && (
-                <Link href="/explore" className="mt-5 inline-block rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-bg">
-                  Explore a Website
+              {!total && tab === "components" && (
+                <Link href="/analyse" className="mt-5 inline-block rounded-lg bg-ink px-5 py-2.5 text-sm font-medium text-bg">
+                  Analyse Website
                 </Link>
               )}
             </div>
@@ -139,7 +174,7 @@ export function Board({ items, counts, collections, filters, active }: Props) {
                   onDragOver={(e) => onDragOver(e, item.id)}
                   onDragLeave={() => setDropAt(null)}
                   onDrop={onDrop}
-                  className={`group relative rounded-2xl border bg-surface transition ${
+                  className={`group relative rounded-xl border bg-surface transition ${
                     selected.includes(item.id) ? "border-accent ring-2 ring-accent/30" : "border-line hover:border-muted"
                   } ${dragId === item.id ? "opacity-40" : ""} ${
                     dropAt?.id === item.id ? (dropAt.place === "before" ? "shadow-[-4px_0_0_var(--accent)]" : "shadow-[4px_0_0_var(--accent)]") : ""
@@ -196,7 +231,7 @@ function Card({ item }: { item: ItemCard }) {
             </span>
           )}
         </div>
-        <div className="truncate text-xs text-muted">{[item.category, item.site].filter(Boolean).join(" · ")}</div>
+        <div className="truncate text-xs text-muted">{[item.variantOf ? "Variation" : item.category, item.site].filter(Boolean).join(" · ")}</div>
         <div className="text-xs text-muted">{day(item.createdAt)}</div>
       </div>
     </Link>
@@ -213,7 +248,7 @@ function Collections({
 }: {
   collections: Props["collections"];
   current?: Props["collections"][number];
-  href: (p: Partial<Props["active"]>) => string;
+  href: (p: Partial<Query>) => string;
   act: Act;
 }) {
   const [name, setName] = useState("");
@@ -293,7 +328,7 @@ function SelectionBar({
 }) {
   const [target, setTarget] = useState("");
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface p-3 text-sm">
+    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 text-sm">
       <span className="font-medium">{selected.length} selected</span>
       {collections.length > 0 && (
         <>
@@ -312,19 +347,19 @@ function SelectionBar({
             type="button"
             disabled={!target}
             onClick={() => act(() => A.addToCollection(target, selected), clear)}
-            className="rounded-full border border-line px-3 py-1 hover:border-muted disabled:opacity-50"
+            className="rounded-lg border border-line px-3 py-1 hover:border-muted disabled:opacity-50"
           >
             Add to collection
           </button>
         </>
       )}
       {current && (
-        <button type="button" onClick={() => act(() => A.removeFromCollection(current.id, selected), clear)} className="rounded-full border border-line px-3 py-1 hover:border-muted">
+        <button type="button" onClick={() => act(() => A.removeFromCollection(current.id, selected), clear)} className="rounded-lg border border-line px-3 py-1 hover:border-muted">
           Remove from “{current.name}”
         </button>
       )}
       {selected.length >= 2 && selected.length <= 4 ? (
-        <Link href={`/board/compare?ids=${selected.join(",")}`} className="rounded-full border border-line px-3 py-1 hover:border-muted">
+        <Link href={`/library/compare?ids=${selected.join(",")}`} className="rounded-lg border border-line px-3 py-1 hover:border-muted">
           Compare
         </Link>
       ) : (
@@ -336,7 +371,7 @@ function SelectionBar({
           if (confirm(`Delete ${selected.length} item${selected.length > 1 ? "s" : ""} for good? This removes their screenshots and code and can't be undone.`))
             act(() => A.deleteItems(selected), clear);
         }}
-        className="rounded-full border border-line px-3 py-1 text-danger hover:border-danger"
+        className="rounded-lg border border-line px-3 py-1 text-danger hover:border-danger"
       >
         Delete
       </button>
