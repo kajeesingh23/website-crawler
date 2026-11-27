@@ -24,8 +24,11 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm test
+      - run: npm run extension:zip
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         # A release published on the website already exists; don't try to create it twice.
-        run: gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+          gh release upload "$GITHUB_REF_NAME" dist/plax-extension-*.zip --clobber

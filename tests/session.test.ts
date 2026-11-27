@@ -11,7 +11,7 @@ import type { Page } from "playwright";
 process.env.PDI_HEADLESS = "1";
 process.env.PDI_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "pdi-test-"));
 
-const { openWebsite, runCommand, getSnapshot, closeWebsite } = await import("../src/lib/inspector/session.ts");
+const { openWebsite, runCommand, getSnapshot, closeWebsite, selectBySelector } = await import("../src/lib/inspector/session.ts");
 const { getHomeData } = await import("../src/lib/db.ts");
 const { describeLayout, describeMovement, movementBetween } = await import("../src/lib/inspector/describe.ts");
 const { saveItem, saveComponent, dataDir } = await import("../src/lib/db.ts");
@@ -154,4 +154,19 @@ test("a saved component keeps its code as version 1", () => {
 
 test("bad links never reach the browser", async () => {
   await assert.rejects(openWebsite("file:///etc/passwd"), /Only website links/);
+});
+
+test("Analyse Website: one Save keeps the picture, exact copy, design and animation", async () => {
+  const { saveLiveSelection, liveCopy } = await import("../src/lib/captures.ts");
+  const { getItem } = await import("../src/lib/library.ts");
+  await openWebsite(`${url}motion`);
+  assert.equal(await selectBySelector("#btn"), true);
+  await until(() => getSnapshot().selection?.design || undefined, "design read");
+  assert.match((await liveCopy()).html, /pdi-root/);
+  await assert.rejects(saveLiveSelection("  "), /name/);
+  const { id } = await saveLiveSelection("Buy button");
+  const item = getItem(id)!;
+  assert.equal(item.kind, "component");
+  assert.match(item.code.html!, /pdi-root/);
+  assert.ok((item.observed as { design?: unknown }).design, "measured design kept");
 });

@@ -61,7 +61,7 @@ export function recordWebsite(url: string, title: string) {
  * the page goes in `observed`. Returns the new item's id.
  */
 export function saveItem(item: {
-  kind: "animation" | "component" | "design_system";
+  kind: "animation" | "component" | "design_system" | "asset";
   name: string;
   sourceUrl?: string;
   observed: unknown;
@@ -70,6 +70,8 @@ export function saveItem(item: {
   category?: string;
   tags?: string[];
   description?: string;
+  analysisId?: string;
+  variantOf?: string;
 }) {
   const id = randomUUID();
   let thumbnail: string | null = null;
@@ -84,13 +86,14 @@ export function saveItem(item: {
       : undefined;
     db()
       .prepare(
-        `INSERT INTO items (id, kind, name, website_id, source_url, thumbnail, observed, inferred, category, tags, description, board_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MIN(board_order), 0) - 1 FROM items))`, // newest first on the board
+        `INSERT INTO items (id, kind, name, website_id, source_url, thumbnail, observed, inferred, category, tags, description, analysis_id, variant_of, board_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MIN(board_order), 0) - 1 FROM items))`, // newest first on the board
       )
       .run(
         id, item.kind, item.name, site?.id ?? null, item.sourceUrl ?? null, thumbnail,
         JSON.stringify(item.observed), JSON.stringify(item.inferred ?? {}),
         item.category ?? null, JSON.stringify(item.tags ?? []), item.description ?? null,
+        item.analysisId ?? null, item.variantOf ?? null,
       );
   } catch (e) {
     if (thumbnail) fs.rmSync(path.join(dataDir, thumbnail), { force: true }); // no orphan files
@@ -101,6 +104,7 @@ export function saveItem(item: {
 
 /** Saves a recreated component: the item, plus its code as version 1 in data/components/<id>/v1/. */
 export function saveComponent(c: {
+  kind?: "component" | "asset";
   name: string;
   sourceUrl?: string;
   png?: Buffer;
@@ -112,9 +116,11 @@ export function saveComponent(c: {
   category?: string;
   tags?: string[];
   description?: string;
+  analysisId?: string;
+  variantOf?: string;
 }) {
-  const { html, react, note, ...item } = c;
-  const id = saveItem({ kind: "component", ...item });
+  const { html, react, note, kind, ...item } = c;
+  const id = saveItem({ kind: kind ?? "component", ...item });
   const rel = `components/${id}/v1`;
   try {
     fs.mkdirSync(path.join(dataDir, rel), { recursive: true });
@@ -133,6 +139,19 @@ export function saveComponent(c: {
   return id;
 }
 
+/** A new version of a saved item's code; earlier versions stay as they were. Returns the version number. */
+export function addVersion(itemId: string, files: { html: string; react?: string }, note: string, framework: string) {
+  const { n } = db().prepare("SELECT COALESCE(MAX(version), 0) + 1 AS n FROM item_versions WHERE item_id = ?").get(itemId) as { n: number };
+  const rel = `components/${itemId}/v${n}`;
+  fs.mkdirSync(path.join(dataDir, rel), { recursive: true });
+  fs.writeFileSync(path.join(dataDir, rel, "component.html"), files.html);
+  if (files.react) fs.writeFileSync(path.join(dataDir, rel, "Component.tsx"), files.react);
+  db()
+    .prepare("INSERT INTO item_versions (id, item_id, version, framework, code_path, change_note) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(randomUUID(), itemId, n, framework, rel, note);
+  return n;
+}
+
 export type RecentWebsite = { url: string; title: string | null; last_seen: string };
 
 export function getHomeData() {
@@ -145,6 +164,7 @@ export function getHomeData() {
     websites: count("SELECT COUNT(*) n FROM websites"),
     recentWebsites: d
       .prepare("SELECT url, title, last_seen FROM websites ORDER BY last_seen DESC LIMIT 6")
-      .all() as RecentWebsite[],
+      .all()
+      .map((r) => ({ ...r })) as RecentWebsite[], // plain objects, so they can go to the browser
   };
 }

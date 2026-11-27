@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { dataDir, db, saveItem } from "./db.ts";
+import { dataDir, db, saveComponent, saveItem } from "./db.ts";
 import type { SystemData } from "./system/extract-system.ts";
 import { designMd } from "./system/design-md.ts";
 import { describeLayout, describeMovement, movementBetween } from "./inspector/describe.ts";
@@ -38,6 +38,8 @@ export type Query = {
   tag?: string;
   from?: string; // YYYY-MM-DD
   to?: string;
+  kinds?: string[]; // only these kinds (a Library tab)
+  variations?: boolean; // only variations of other items
 };
 
 export type ItemCard = {
@@ -53,6 +55,7 @@ export type ItemCard = {
   site: string | null;
   createdAt: string;
   moves: boolean;
+  variantOf: string | null;
 };
 
 const STOP = new Set(
@@ -67,6 +70,10 @@ export function ftsQuery(text: string): string | null {
 }
 
 const CAT = "COALESCE(i.category, json_extract(i.observed, '$.element.label'))";
+// Something was seen moving: on its own, on hover or when scrolled into view (not just "motion was looked at").
+const MOVING = ["running", "hover.changes", "hover.animations", "scroll.changes", "scroll.animations"]
+  .map((k) => `COALESCE(json_array_length(i.observed, '$.motion.${k}'), 0)`)
+  .join(" + ");
 
 export function listItems(query: Query = {}): ItemCard[] {
   const where: string[] = [];
@@ -88,10 +95,12 @@ export function listItems(query: Query = {}): ItemCard[] {
   if (query.tag) add("EXISTS (SELECT 1 FROM json_each(i.tags) WHERE value = ?)", query.tag);
   if (query.from) add("date(i.created_at) >= date(?)", query.from);
   if (query.to) add("date(i.created_at) <= date(?)", query.to);
+  if (query.kinds?.length) add(`i.kind IN (${query.kinds.map(() => "?").join(",")})`, ...query.kinds);
+  if (query.variations) add("i.variant_of IS NOT NULL");
 
   const cols = `i.id, i.kind, i.name, i.description, ${CAT} AS category, i.tags, i.favourite, i.thumbnail, i.source_url,
-    i.created_at, COALESCE(w.title, w.url) AS site,
-    (i.kind = 'animation' OR json_extract(i.observed, '$.motion') IS NOT NULL) AS moves`;
+    i.created_at, i.variant_of, COALESCE(w.title, w.url) AS site,
+    (i.kind = 'animation' OR ${MOVING} > 0) AS moves`;
   const sql = fts
     ? `SELECT ${cols} FROM items_fts JOIN items i ON i.rowid = items_fts.rowid LEFT JOIN websites w ON w.id = i.website_id
        WHERE items_fts MATCH ? ${where.map((w) => `AND ${w}`).join(" ")} ORDER BY items_fts.rank`
@@ -111,6 +120,7 @@ export function listItems(query: Query = {}): ItemCard[] {
     site: (r.site as string) ?? null,
     createdAt: String(r.created_at),
     moves: Boolean(r.moves),
+    variantOf: (r.variant_of as string) ?? null,
   }));
 }
 
@@ -123,7 +133,20 @@ export function libraryCounts() {
     assets: n("SELECT COUNT(*) n FROM items WHERE kind = 'asset'"),
     designSystems: n("SELECT COUNT(*) n FROM items WHERE kind = 'design_system'"),
     favourites: n("SELECT COUNT(*) n FROM items WHERE favourite = 1"),
+    variations: n("SELECT COUNT(*) n FROM items WHERE variant_of IS NOT NULL"),
   };
+}
+
+/** Every website you've visited, with how much you saved from it and how many extension sessions it had. */
+export function listWebsites() {
+  return db()
+    .prepare(
+      `SELECT w.id, w.url, w.title, w.last_seen AS lastSeen,
+         (SELECT COUNT(*) FROM items i WHERE i.website_id = w.id) AS items,
+         (SELECT COUNT(*) FROM analyses a WHERE a.website_id = w.id) AS analyses
+       FROM websites w ORDER BY w.last_seen DESC`,
+    )
+    .all() as { id: string; url: string; title: string | null; lastSeen: string; items: number; analyses: number }[];
 }
 
 export function listCollections() {
@@ -132,7 +155,8 @@ export function listCollections() {
       `SELECT c.id, c.name, COUNT(ci.item_id) AS count FROM collections c
        LEFT JOIN collection_items ci ON ci.collection_id = c.id GROUP BY c.id ORDER BY c.created_at DESC, c.rowid DESC`,
     )
-    .all() as { id: string; name: string; count: number }[];
+    .all()
+    .map((r) => ({ ...r })) as { id: string; name: string; count: number }[]; // plain objects, so they can go to the browser
 }
 
 /** Choices for the library's filters: only websites, categories and tags that are actually used. */
@@ -141,7 +165,8 @@ export function filterOptions() {
   return {
     websites: d
       .prepare("SELECT DISTINCT w.id, COALESCE(w.title, w.url) AS name FROM websites w JOIN items i ON i.website_id = w.id ORDER BY name")
-      .all() as { id: string; name: string }[],
+      .all()
+      .map((r) => ({ ...r })) as { id: string; name: string }[],
     categories: (d.prepare(`SELECT DISTINCT ${CAT} AS c FROM items i WHERE c IS NOT NULL ORDER BY c`).all() as { c: string }[]).map((r) => r.c),
     tags: (d.prepare("SELECT DISTINCT value AS t FROM items, json_each(items.tags) ORDER BY t").all() as { t: string }[]).map((r) => r.t),
   };
@@ -155,6 +180,8 @@ export type ItemDetail = ItemCard & {
   versions: { version: number; framework: string | null; note: string | null; createdAt: string; files: string[]; codePath: string | null }[];
   collections: string[];
   code: { html?: string; react?: string };
+  original: { id: string; name: string } | null; // what this is a variation of
+  variations: { id: string; name: string; thumbnail: string | null }[];
 };
 
 export function getItem(id: string): ItemDetail | null {
@@ -182,7 +209,43 @@ export function getItem(id: string): ItemDetail | null {
     versions,
     collections: (db().prepare("SELECT collection_id AS id FROM collection_items WHERE item_id = ?").all(id) as { id: string }[]).map((r) => r.id),
     code: { html: read("component.html"), react: read("Component.tsx") },
+    original: originalOf(base.variantOf),
+    variations: db()
+      .prepare("SELECT id, name, thumbnail FROM items WHERE variant_of = ? ORDER BY created_at DESC")
+      .all(id)
+      .map((r) => ({ ...r })) as ItemDetail["variations"],
   };
+}
+
+function originalOf(id: string | null) {
+  const row = id ? db().prepare("SELECT id, name FROM items WHERE id = ?").get(id) : undefined;
+  return row ? { id: String(row.id), name: String(row.name) } : null; // a plain object, so it can go to the browser
+}
+
+/**
+ * A customised copy saved as its own item, linked to the original by variant_of.
+ * The original, its files and its versions are never changed.
+ */
+export function saveVariation(sourceId: string, v: { name: string; html: string; png?: Buffer; changes: unknown }): string {
+  const src = getItem(sourceId);
+  if (!src) throw new Error("The original no longer exists.");
+  const name = v.name.trim();
+  if (!name || name.length > 120) throw new Error("A name needs 1 to 120 characters.");
+  if (!v.html.includes("pdi-root") || v.html.length > 6_000_000) throw new Error("The customised copy isn't valid.");
+  return saveComponent({
+    kind: src.kind === "asset" ? "asset" : "component",
+    name,
+    sourceUrl: src.sourceUrl ?? undefined,
+    png: v.png,
+    html: v.html,
+    note: "Customised in Plax",
+    variantOf: src.id,
+    observed: src.observed, // what was measured on the original page; the changes are kept apart below
+    inferred: { source: "variation", of: src.id, changes: v.changes },
+    category: src.category ?? undefined,
+    tags: [...new Set([...src.tags, "variation"])],
+    description: `Variation of “${src.name}”`,
+  });
 }
 
 // Folders the app may serve files from; everything else in data/ (the database above all) stays private.

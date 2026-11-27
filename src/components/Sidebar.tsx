@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Logo } from "./Logo";
 
 const NAV = [
-  { href: "/", label: "Home" },
-  { href: "/explore", label: "Explore Website" },
-  { href: "/board", label: "My Board" },
-  { href: "/library", label: "Design Library" },
-  { href: "/design-systems", label: "Design Systems" },
+  { href: "/analyse", label: "Analyse Website" },
+  { href: "/library", label: "Library" },
+  { href: "/settings", label: "Settings" },
 ];
 
 /** Highlights the current page; reading the address needs a loading boundary (see layout). */
@@ -18,14 +17,13 @@ export function Sidebar() {
 
 export function SidebarNav({ path }: { path: string }) {
   return (
-    <aside className="border-b border-line bg-surface md:sticky md:top-0 md:h-dvh md:w-60 md:shrink-0 md:border-r md:border-b-0">
-      <div className="flex items-center gap-4 overflow-x-auto px-4 py-3 md:flex-col md:items-stretch md:gap-1 md:px-4 md:py-6">
-        <Link href="/" className="mr-2 shrink-0 font-display text-xl leading-tight md:mb-8 md:px-3">
-          Personal Design
-          <br className="hidden md:block" /> Intelligence
+    <aside className="border-b border-line bg-surface md:sticky md:top-0 md:h-dvh md:w-56 md:shrink-0 md:border-r md:border-b-0">
+      <nav aria-label="Main" className="flex items-center gap-2 overflow-x-auto px-4 py-3 md:flex-col md:items-stretch md:gap-1 md:px-3 md:py-6">
+        <Link href="/analyse" aria-label="Plax home" className="mr-2 shrink-0 md:mb-8 md:px-3">
+          <Logo />
         </Link>
         {NAV.map(({ href, label }) => {
-          const active = href === "/" ? path === "/" : path.startsWith(href);
+          const active = path.startsWith(href);
           return (
             <Link
               key={href}
@@ -39,7 +37,7 @@ export function SidebarNav({ path }: { path: string }) {
             </Link>
           );
         })}
-      </div>
+      </nav>
     </aside>
   );
 }

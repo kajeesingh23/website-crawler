@@ -19,3 +19,23 @@ test("other websites, devices and tricks are refused", () => {
   assert.match(refuse({ ...base, host: "evil.example:3000", origin: "http://evil.example:3000" })!, /this computer/, "DNS rebinding");
   assert.match(refuse({ ...base, host: null })!, /this computer/);
 });
+
+const ext = "chrome-extension://abcdefghijklmnopabcdefghijklmnop";
+const fromExt = { ...base, path: "/api/captures/save", origin: ext, secFetchSite: "none", secFetchMode: "cors" };
+
+test("the paired extension may save captures, and nothing else", () => {
+  const paired = { origin: ext, tokenValid: true };
+  assert.equal(refuse(fromExt, paired), null);
+  assert.match(refuse({ ...fromExt, path: "/api/session" }, paired)!, /paired Plax extension/, "only the captures API");
+  assert.match(refuse({ ...fromExt, path: "/api/library/files/screenshots/x.png", method: "GET" }, paired)!, /paired Plax extension/);
+  assert.match(refuse(fromExt, { origin: ext, tokenValid: false })!, /paired Plax extension/, "wrong or old code");
+  assert.match(refuse(fromExt, null)!, /paired Plax extension/, "nothing paired");
+  assert.match(refuse({ ...fromExt, origin: "chrome-extension://ponmlkjihgfedcbaponmlkjihgfedcba" }, paired)!, /paired Plax extension/, "another extension");
+  assert.match(refuse({ ...fromExt, host: "evil.example:3000" }, paired)!, /this computer/, "DNS rebinding still refused");
+});
+
+test("a new code is tied to the first extension that uses it", () => {
+  const waiting = { origin: null, tokenValid: true };
+  assert.equal(refuse({ ...fromExt, path: "/api/captures/pair" }, waiting), null);
+  assert.match(refuse(fromExt, waiting)!, /paired Plax extension/, "must pair before saving");
+});
