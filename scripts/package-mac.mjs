@@ -52,4 +52,8 @@ The Chrome extension's folder is shown in the Terminal window (use it with "Load
 const dmg = path.join(root, "dist", `Plax-${version}.dmg`);
 fs.rmSync(dmg, { force: true });
 execFileSync("hdiutil", ["create", "-volname", `Plax ${version}`, "-srcfolder", stage, "-format", "UDZO", "-ov", dmg], { stdio: "inherit" });
+// The Applications shortcut points at the real /Applications: remove it so no tool (TypeScript,
+// a later cleanup) ever walks into it from here, then drop the working folder.
+fs.unlinkSync(path.join(stage, "Applications"));
+fs.rmSync(stage, { recursive: true, force: true });
 console.log(`Made ${path.relative(root, dmg)}`);
