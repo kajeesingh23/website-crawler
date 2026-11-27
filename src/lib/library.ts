@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { dataDir, db, saveComponent, saveItem } from "./db.ts";
 import type { SystemData } from "./system/extract-system.ts";
 import { designMd } from "./system/design-md.ts";
-import { describeLayout, describeMovement, movementBetween } from "./inspector/describe.ts";
+import { cardPreview, describeLayout, describeMovement, movementBetween, type CardPreview } from "./inspector/describe.ts";
 import type { Selection } from "./inspector/session.ts";
 
 // ---------- Reading ----------
@@ -55,6 +55,7 @@ export type ItemCard = {
   site: string | null;
   createdAt: string;
   moves: boolean;
+  preview: CardPreview | null; // the recorded movement, replayed on the card
   variantOf: string | null;
 };
 
@@ -100,7 +101,7 @@ export function listItems(query: Query = {}): ItemCard[] {
 
   const cols = `i.id, i.kind, i.name, i.description, ${CAT} AS category, i.tags, i.favourite, i.thumbnail, i.source_url,
     i.created_at, i.variant_of, COALESCE(w.title, w.url) AS site,
-    (i.kind = 'animation' OR ${MOVING} > 0) AS moves`;
+    (i.kind = 'animation' OR ${MOVING} > 0) AS moves, json_extract(i.observed, '$.motion') AS motion`;
   const sql = fts
     ? `SELECT ${cols} FROM items_fts JOIN items i ON i.rowid = items_fts.rowid LEFT JOIN websites w ON w.id = i.website_id
        WHERE items_fts MATCH ? ${where.map((w) => `AND ${w}`).join(" ")} ORDER BY items_fts.rank`
@@ -120,6 +121,7 @@ export function listItems(query: Query = {}): ItemCard[] {
     site: (r.site as string) ?? null,
     createdAt: String(r.created_at),
     moves: Boolean(r.moves),
+    preview: r.motion ? cardPreview(JSON.parse(String(r.motion))) : null,
     variantOf: (r.variant_of as string) ?? null,
   }));
 }

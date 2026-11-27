@@ -1,5 +1,6 @@
 import type { Design } from "./extract.ts";
-import type { Anim, MotionState } from "./motion.ts";
+import type { Anim, Declared, Keyframe, MotionState } from "./motion.ts";
+import type { Interaction, Motion } from "./session.ts";
 
 type Layout = Design["layout"];
 
@@ -199,3 +200,60 @@ export function easingName(easing: string): string {
 }
 
 export const duration = (ms: number) => (ms >= 1000 ? `${Math.round(ms / 100) / 10}s` : `${Math.round(ms)}ms`);
+
+// Only these can be replayed on a screenshot; colour and other changes are described instead.
+export const PLAYABLE = new Set(["transform", "translate", "scale", "rotate", "opacity", "filter"]);
+export const camel = (p: string) => p.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+
+/** The transition the website declared for this change, if any (falls back to "all"). */
+export function timingFor(prop: string, part: string, transitions: Declared[]) {
+  return (
+    transitions.find((t) => t.part === part && t.prop === prop) ??
+    transitions.find((t) => t.part === part && t.prop === "all") ?? { duration: 0, delay: 0, easing: "linear" }
+  );
+}
+
+/** What a Library card replays to show the movement was recorded. Empty keyframes: recorded, but not playable on a picture. */
+export type CardPreview = { label: string; keyframes: Keyframe[]; duration: number; easing: string; alternate: boolean };
+
+const playableFrames = (frames: Keyframe[]) =>
+  frames.map((k) => Object.fromEntries(Object.entries(k).filter(([p]) => PLAYABLE.has(p) || p === "offset" || p === "easing")));
+
+export function cardPreview(saved: Partial<Motion> | null | undefined): CardPreview | null {
+  if (!saved) return null;
+  // Older or hand-made saves can miss parts; treat missing as "nothing seen".
+  const m = { running: [], transitions: [], hover: null, focus: null, scroll: null, ...saved } as Motion;
+  const anim = (a: Anim, label: string): CardPreview => ({
+    label: `${label} · ${duration(a.duration)}`,
+    keyframes: playableFrames(a.keyframes),
+    duration: a.duration,
+    easing: a.easing,
+    alternate: a.direction.includes("alternate"),
+  });
+  const own = m.running.find((a) => a.keyframes.some((k) => Object.keys(k).some((p) => PLAYABLE.has(p))));
+  if (own) return anim(own, "Moves on its own");
+  const moments: [string, Interaction | null][] = [["On hover", m.hover], ["Scrolling into view", m.scroll], ["On focus", m.focus]];
+  for (const [label, i] of moments) {
+    const whole = i?.changes.filter((c) => c.part === "Whole element" && PLAYABLE.has(c.prop)) ?? [];
+    if (!whole.length) continue;
+    const t = timingFor(whole[0].prop, "Whole element", m.transitions);
+    return {
+      label: `${label} · ${t.duration ? duration(t.duration) : "instant"}`,
+      keyframes: [Object.fromEntries(whole.map((c) => [camel(c.prop), c.from])), Object.fromEntries(whole.map((c) => [camel(c.prop), c.to]))],
+      duration: t.duration || 300, // an instant change is slowed down so it can be seen
+      easing: t.easing,
+      alternate: true,
+    };
+  }
+  for (const [label, i] of moments) {
+    const a = i?.animations.find((x) => x.keyframes.some((k) => Object.keys(k).some((p) => PLAYABLE.has(p))));
+    if (a) return anim(a, label);
+  }
+  // Recorded, but only things a picture can't show (colours, shadows, inner parts).
+  for (const [label, i] of moments) {
+    const c = i?.changes[0];
+    if (c) return { label: `${label} · ${(PROP_NAMES[c.prop] ?? c.prop).toLowerCase()} changes`, keyframes: [], duration: 0, easing: "linear", alternate: false };
+  }
+  if (m.running[0]) return { label: "Moves on its own", keyframes: [], duration: 0, easing: "linear", alternate: false };
+  return null;
+}

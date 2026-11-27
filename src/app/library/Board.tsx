@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition, type DragEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type DragEvent, type FormEvent } from "react";
 import * as A from "@/app/actions";
 import type { Filter, ItemCard, Query } from "@/lib/library";
+import type { CardPreview } from "@/lib/inspector/describe";
 
 type Props = {
   tab: "components" | "assets" | "variations" | "design-systems";
@@ -227,30 +228,71 @@ export function Board({ tab, items, total, collections, filters, options, active
 
 function Card({ item }: { item: ItemCard }) {
   const src = thumb(item.thumbnail);
+  const preview = item.preview;
   return (
-    <Link href={`/library/${item.id}`} className="block">
-      <div className="flex max-h-72 min-h-36 items-center justify-center overflow-hidden rounded-t-2xl bg-bg p-3">
+    <Link href={`/library/${item.id}`} className="group block">
+      <div className="relative flex max-h-72 min-h-36 items-center justify-center overflow-hidden rounded-t-2xl bg-bg p-3 pb-8">
         {src ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt="" className="max-h-64 max-w-full object-contain" loading="lazy" />
+          <Picture src={src} preview={preview} />
         ) : (
           <span className="text-sm text-muted">{item.category ?? "No preview"}</span>
         )}
+        {(preview || item.moves) && (
+          <span
+            className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-accent-soft px-2 py-0.5 text-[11px]"
+            title={preview?.keyframes.length ? "Recorded movement, replayed on the picture" : "Recorded movement (open it to see the details)"}
+          >
+            {preview?.label ?? "Moves"}
+          </span>
+        )}
       </div>
       <div className="space-y-1 p-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="truncate font-medium">{item.name}</div>
-          {item.moves && (
-            <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px]" title="Has animation">
-              Moves
-            </span>
-          )}
-        </div>
+        <div className="truncate font-medium">{item.name}</div>
         <div className="truncate text-xs text-muted">{[item.variantOf ? "Variation" : item.category, item.site].filter(Boolean).join(" · ")}</div>
         <div className="text-xs text-muted">{day(item.createdAt)}</div>
       </div>
     </Link>
   );
+}
+
+/** The card's picture, replaying the movement that was recorded. With "reduce motion" on, only while pointed at. */
+function Picture({ src, preview }: { src: string; preview: CardPreview | null }) {
+  const ref = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !preview?.keyframes.length) return;
+    const timing: KeyframeAnimationOptions = {
+      duration: Math.max(preview.duration, 1),
+      iterations: Infinity,
+      direction: preview.alternate ? "alternate" : "normal",
+      endDelay: 500,
+      fill: "both",
+    };
+    let a: Animation;
+    try {
+      a = el.animate(preview.keyframes, { ...timing, easing: preview.easing });
+    } catch {
+      a = el.animate(preview.keyframes, timing); // an easing the browser can't replay: steady speed
+    }
+    const calm = matchMedia("(prefers-reduced-motion: reduce)");
+    const card = el.closest("a");
+    const play = () => a.play();
+    const stop = () => (calm.matches ? (a.pause(), (a.currentTime = 0)) : undefined);
+    stop();
+    card?.addEventListener("pointerenter", play);
+    card?.addEventListener("focus", play);
+    card?.addEventListener("pointerleave", stop);
+    card?.addEventListener("blur", stop);
+    return () => {
+      a.cancel();
+      card?.removeEventListener("pointerenter", play);
+      card?.removeEventListener("focus", play);
+      card?.removeEventListener("pointerleave", stop);
+      card?.removeEventListener("blur", stop);
+    };
+  }, [preview]);
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img ref={ref} src={src} alt="" className="max-h-64 max-w-full object-contain" loading="lazy" />;
 }
 
 type Act = (fn: () => Promise<{ error?: string }>, after?: () => void) => void;
