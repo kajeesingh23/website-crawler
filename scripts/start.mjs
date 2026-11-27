@@ -1,6 +1,6 @@
 // One-step start for people who downloaded Plax: installs what's missing the first time, builds the
 // app and the Chrome extension, then runs Plax on this computer only (127.0.0.1) and opens it.
-// Everything you save stays in the data/ folder next to this file.
+// Everything you save stays in the data/ folder here, or in PDI_DATA_DIR when an installer sets it.
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
@@ -42,14 +42,25 @@ const busy = await new Promise((ok) => {
   const s = net.connect(port, "127.0.0.1", () => (s.end(), ok(true))).on("error", () => ok(false));
 });
 const url = `http://localhost:${port}`;
+const openBrowser = () => {
+  const [cmd, args] = { darwin: ["open", [url]], win32: ["cmd", ["/c", "start", "", url]] }[process.platform] ?? ["xdg-open", [url]];
+  spawn(cmd, args, { stdio: "ignore", detached: true }).unref();
+};
 if (busy) {
-  console.error(`✖ Something is already using port ${port}. If Plax is already running, open ${url}. Otherwise close the other program and try again.`);
+  // Usually Plax itself, opened a second time: just show it.
+  const plax = await fetch(url).then((r) => r.text(), () => "").then((t) => t.includes("Plax"));
+  if (plax) {
+    say(`Plax is already running. Opening ${url}`);
+    openBrowser();
+    process.exit(0);
+  }
+  console.error(`✖ Another program is using port ${port}. Close it and start Plax again.`);
   process.exit(1);
 }
 
 say(`Plax is starting at ${url}`);
 console.log(`  Chrome extension folder (Load unpacked): ${path.join(root, "dist", "extension")}`);
-console.log("  Your library is saved in:", path.join(root, "data"));
+console.log("  Your library is saved in:", path.resolve(root, process.env.PDI_DATA_DIR ?? "data"));
 console.log("  Keep this window open while you use Plax. Close it to stop.\n");
 
 const app = spawn(npm, ["run", "start", "--", "--port", String(port)], { cwd: root, stdio: "inherit", shell: process.platform === "win32" });
@@ -57,8 +68,7 @@ app.on("exit", (code) => process.exit(code ?? 0));
 // Open the browser once the app answers.
 for (let i = 0; i < 60; i++) {
   if (await fetch(url).then(() => true, () => false)) {
-    const opener = { darwin: ["open", [url]], win32: ["cmd", ["/c", "start", "", url]] }[process.platform] ?? ["xdg-open", [url]];
-    spawn(opener[0], opener[1], { stdio: "ignore", detached: true }).unref();
+    openBrowser();
     break;
   }
   await new Promise((r) => setTimeout(r, 500));

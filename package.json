@@ -12,7 +12,8 @@
     "extension:build": "node scripts/build-extension.mjs",
     "extension:zip": "node scripts/build-extension.mjs --zip",
     "start:easy": "node scripts/start.mjs",
-    "package": "node scripts/package.mjs"
+    "package": "node scripts/package.mjs",
+    "package:mac": "node scripts/package-mac.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.11.0",

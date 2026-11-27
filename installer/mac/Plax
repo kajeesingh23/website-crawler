@@ -1,0 +1,35 @@
+#!/bin/bash
+# What runs when you open Plax.app. The first time (and after an update) it copies this version's
+# files to ~/Library/Application Support/Plax, then starts Plax in a Terminal window.
+# Your library lives in ~/Library/Application Support/Plax/data, so updates never touch it.
+set -e
+RES="$(cd "$(dirname "$0")/../Resources" && pwd)"
+VERSION="$(cat "$RES/version")"
+HOME_DIR="$HOME/Library/Application Support/Plax"
+APP="$HOME_DIR/app-$VERSION"
+
+if [ ! -f "$APP/package.json" ]; then
+  mkdir -p "$HOME_DIR"
+  rm -rf "$APP.partial"
+  cp -R "$RES/app" "$APP.partial"
+  mv "$APP.partial" "$APP"
+  # Older versions' program files (not your library) are no longer needed.
+  for old in "$HOME_DIR"/app-*; do [ "$old" = "$APP" ] || rm -rf "$old"; done
+fi
+
+LAUNCH="$HOME_DIR/Open Plax.command"
+cat > "$LAUNCH" <<LAUNCHER
+#!/bin/bash
+export PDI_DATA_DIR="\$HOME/Library/Application Support/Plax/data"
+cd "$APP" || exit 1
+if ! command -v node >/dev/null 2>&1; then
+  echo "Plax needs Node.js. Install the LTS version from https://nodejs.org, then open Plax again."
+  open "https://nodejs.org"
+  read -n 1 -s -r -p "Press any key to close."
+  exit 1
+fi
+node scripts/start.mjs
+read -n 1 -s -r -p "Plax stopped. Press any key to close."
+LAUNCHER
+chmod +x "$LAUNCH"
+open -a Terminal "$LAUNCH"
