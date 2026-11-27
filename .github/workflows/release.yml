@@ -33,3 +33,10 @@ jobs:
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
           gh release upload "$GITHUB_REF_NAME" dist/plax-*.zip --clobber
+
+  # The Mac DMG and the Windows Setup.exe, attached to the release once it exists.
+  installers:
+    needs: release
+    uses: ./.github/workflows/installers.yml
+    with:
+      tag: ${{ github.ref_name }}

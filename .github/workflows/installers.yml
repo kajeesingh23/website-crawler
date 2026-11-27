@@ -1,0 +1,90 @@
+# Builds the Mac DMG and the Windows Setup.exe. Run it by hand from the Actions tab (the files appear
+# under the run's Artifacts), or it runs after Release and attaches both to that release.
+# The Windows job also installs Plax silently, starts it, checks a page, and uninstalls it.
+name: Installers
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npm run package:mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plax-mac
+          path: dist/Plax-*.dmg
+      - if: inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag }}" dist/Plax-*.dmg --clobber
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium
+      - name: Install NSIS if this machine doesn't have it
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "C:\Program Files (x86)\NSIS\makensis.exe") -and -not (Get-Command makensis -ErrorAction SilentlyContinue)) { choco install nsis -y --no-progress }
+      - run: npm run package:windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plax-windows
+          path: dist/Plax-Setup-*.exe
+      - name: Install, start, check and uninstall
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem dist\Plax-Setup-*.exe).FullName
+          Start-Process -Wait -FilePath $setup -ArgumentList "/S"
+          $app = "$env:LOCALAPPDATA\Plax\app"
+          $data = "$env:LOCALAPPDATA\Plax\data"
+          if (-not (Test-Path "$app\Plax.bat")) { throw "Plax wasn't installed" }
+          if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Plax.lnk")) { throw "No Start menu shortcut" }
+          $env:PDI_DATA_DIR = $data
+          $env:PORT = "3130"
+          $run = Start-Process node -ArgumentList "scripts\start.mjs" -WorkingDirectory $app -PassThru -NoNewWindow
+          $ok = $false
+          foreach ($i in 1..120) {
+            try { if ((Invoke-WebRequest http://localhost:3130/library -UseBasicParsing).StatusCode -eq 200) { $ok = $true; break } } catch {}
+            Start-Sleep 5
+          }
+          if (-not $ok) { throw "Plax didn't start" }
+          if (-not (Test-Path $data)) { throw "The library folder wasn't made in $data" }
+          Write-Host "Plax started from the installer and saved its library in $data"
+          Get-CimInstance Win32_Process -Filter "Name='node.exe'" | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+          Start-Sleep 3
+          Start-Process -Wait -FilePath "$app\Uninstall Plax.exe" -ArgumentList "/S"
+          Start-Sleep 15
+          if (Test-Path "$app\package.json") { throw "Uninstall left the program behind" }
+          if (-not (Test-Path $data)) { throw "Uninstall removed the library" }
+          Write-Host "Uninstalled; the library was kept"
+      - if: inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh release upload "${{ inputs.tag }}" dist/Plax-Setup-*.exe --clobber

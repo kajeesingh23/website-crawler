@@ -43,7 +43,26 @@ React export without a key is clearly labelled as the exact copy wrapped in a co
 
 ## Install
 
-### The easy way (no terminal)
+### The easy way: installers
+
+Install **Node.js** (the LTS version) from https://nodejs.org first, and use **Google Chrome**.
+Then download from the [Releases page](https://github.com/kajeesingh23/website-crawler/releases):
+
+- **Mac: `Plax-<version>.dmg`.** Open it and drag Plax onto Applications. The first time you open
+  Plax, macOS says it can't check the app (it isn't signed by Apple): click **Done**, then go to
+  **System Settings → Privacy & Security** and click **Open Anyway**. Your library is kept in
+  `~/Library/Application Support/Plax/data`.
+- **Windows: `Plax-Setup-<version>.exe`.** Run it (no admin password needed). If Windows shows
+  "Windows protected your PC", click **More info → Run anyway**. Plax appears in the Start menu and
+  on the desktop, and your library is kept in `%LOCALAPPDATA%\Plax\data`.
+
+The first start installs everything (a few minutes, once) in a terminal window, then Plax opens in
+your browser. Keep that window open while you use Plax. Updating or uninstalling never deletes your
+library. To build the installers yourself: `npm run package:mac` (on a Mac) and
+`npm run package:windows` (needs [NSIS](https://nsis.sourceforge.io)); GitHub builds both for every
+release, and you can also run the **Installers** workflow by hand from the Actions tab.
+
+### The easy way: ZIP (no installer)
 
 1. Install **Node.js** (the LTS version) from https://nodejs.org and use **Google Chrome**.
 2. Download `plax-<version>.zip` from the [Releases page](https://github.com/kajeesingh23/website-crawler/releases) and unzip it.
