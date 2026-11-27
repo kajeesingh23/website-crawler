@@ -43,6 +43,23 @@ React export without a key is clearly labelled as the exact copy wrapped in a co
 
 ## Install
 
+### The easy way (no terminal)
+
+1. Install **Node.js** (the LTS version) from https://nodejs.org and use **Google Chrome**.
+2. Download `plax-<version>.zip` from the [Releases page](https://github.com/kajeesingh23/website-crawler/releases) and unzip it.
+3. **Mac:** right-click **Start Plax.command** → **Open** (only the first time; after that, double-click it).
+   **Windows:** double-click **Start Plax.bat**.
+
+The first start installs everything (a few minutes, once), then Plax opens in your browser. Keep that
+window open while you use it. Plax runs only on your computer, and everything you save stays in the
+`data` folder inside the Plax folder. Keep that folder when you move or update Plax. The extension is
+built for you in `dist/extension` (see below to load it).
+
+To make that ZIP yourself: commit your changes, then run `npm run package`. It packs only files in
+Git, so your own library, screenshots and keys are never included.
+
+### For developers
+
 You need **Node.js 22.18 or newer** and **Google Chrome**.
 
 ```bash
