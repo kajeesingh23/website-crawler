@@ -51,3 +51,31 @@ test("only real changes are reported", () => {
   assert.deepEqual(diffStates(s("red"), s("blue")), [{ part: "Whole element", prop: "background-color", from: "red", to: "blue" }]);
   assert.deepEqual(diffStates(s("red"), s("red")), []);
 });
+
+import { cardPreview } from "../src/lib/inspector/describe.ts";
+import type { Motion } from "../src/lib/inspector/session.ts";
+
+test("Library cards replay what was recorded", () => {
+  const none: Motion = { running: [], scriptedIdle: false, transitions: [], hover: null, focus: null, scroll: null, scrollTimelines: [] };
+  assert.equal(cardPreview(none), null);
+  assert.equal(cardPreview(undefined), null);
+
+  const lift = cardPreview({
+    ...none,
+    transitions: [{ part: "Whole element", prop: "transform", duration: 200, delay: 0, easing: "ease-out" }],
+    hover: { changes: [{ part: "Whole element", prop: "transform", from: "none", to: "matrix(1, 0, 0, 1, 0, -2)" }], animations: [] },
+  })!;
+  assert.equal(lift.label, "On hover · 200ms");
+  assert.deepEqual(lift.keyframes, [{ transform: "none" }, { transform: "matrix(1, 0, 0, 1, 0, -2)" }]);
+  assert.equal(lift.alternate, true);
+
+  const spin = cardPreview({
+    ...none,
+    running: [{ key: "s", kind: "css-animation", name: "spin", part: "Whole element", duration: 1000, delay: 0, easing: "linear", iterations: "infinite", direction: "normal", keyframes: [{ offset: 0, transform: "rotate(0deg)", color: "red" }, { offset: 1, transform: "rotate(360deg)" }] }],
+  })!;
+  assert.equal(spin.label, "Moves on its own · 1s");
+  assert.deepEqual(spin.keyframes[0], { offset: 0, transform: "rotate(0deg)" }, "colours aren't replayed on a picture");
+
+  const colour = cardPreview({ ...none, hover: { changes: [{ part: "Whole element", prop: "background-color", from: "red", to: "blue" }], animations: [] } })!;
+  assert.deepEqual([colour.label, colour.keyframes], ["On hover · background changes", []]);
+});

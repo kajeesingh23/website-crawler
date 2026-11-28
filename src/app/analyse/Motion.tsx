@@ -4,7 +4,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Interaction, Motion } from "@/lib/inspector/session";
 import type { Anim, Declared, Keyframe } from "@/lib/inspector/motion";
 import {
+  PLAYABLE,
   PROP_NAMES,
+  camel,
+  timingFor,
   bezierOf,
   describeMovement,
   duration,
@@ -13,10 +16,7 @@ import {
   type Change,
 } from "@/lib/inspector/describe";
 
-// Only these are replayed on the preview; anything else from the website is ignored.
-const PLAYABLE = new Set(["transform", "translate", "scale", "rotate", "opacity", "filter"]);
 const COLOUR_PROPS = new Set(["color", "background-color", "border-color", "outline-color"]);
-const camel = (p: string) => p.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 
 /** `untested`: captured with the extension, which can't hover, focus or scroll the element. */
 export function MotionPanel({ motion, image, untested }: { motion: Motion; image?: string; untested?: boolean }) {
@@ -103,14 +103,6 @@ function Scripted() {
     <p className="rounded-xl bg-warn-soft px-4 py-3 text-sm text-warn-ink">
       Something here moves through the website’s own code, so its exact timing can’t be read. Watch it on the website.
     </p>
-  );
-}
-
-/** The transition the website declared for this change, if any (falls back to "all"). */
-function timingFor(prop: string, part: string, transitions: Declared[]) {
-  return (
-    transitions.find((t) => t.part === part && t.prop === prop) ??
-    transitions.find((t) => t.part === part && t.prop === "all") ?? { duration: 0, delay: 0, easing: "linear" }
   );
 }
 
